@@ -1,0 +1,59 @@
+{
+  "name": "arcend-launcher",
+  "version": "0.1.1",
+  "description": "",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder --win",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.arcend.launcher",
+    "productName": "Arcend Launcher",
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://51.89.138.186/launcher/"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "artifactName": "arcend-launcher-setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "uninstallDisplayName": "Arcend Launcher"
+    },
+    "extraResources": [
+      {
+        "from": "runtime/",
+        "to": "runtime/"
+      },
+      {
+        "from": "assets/",
+        "to": "assets/"
+      }
+    ],
+    "asar": true
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^40.4.1",
+    "electron-builder": "^26.7.0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.5",
+    "electron-updater": "^6.7.3",
+    "minecraft-launcher-core": "^3.18.2",
+    "msmc": "^5.0.5",
+    "p-limit": "^7.3.0"
+  }
+}

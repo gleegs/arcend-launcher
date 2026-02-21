@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcend Launcher</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+    <div class="container" id="main-ui">
+        <h1>ARCEND</h1>
+      
+        <div class="settings-group">
+            <label style="display: block; margin-bottom: 10px;">RAM : <span id="ramValue">...</span> GB</label>
+            <input id="ramSlider" type="range" min="2" max="12" step="1">
+        </div>
+      
+        <button id="playBtn">JOUER</button>
+    </div>
+
+    <div id="loader-container" style="display: none;">
+        <div style="display: flex; justify-content: space-between; color: #ccc; font-size: 13px;">
+            <span id="status-text">Initialisation...</span>
+            <span id="percent-text">0%</span>
+        </div>
+        <div class="progress-bg">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div id="debug-console"><div>[Système] Prêt.</div></div>
+    <div id="launcher-version">V.0.0.0</div>
+
+    <script src="./script.js"></script>
+</body>
+</html>

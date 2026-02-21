@@ -1,0 +1,16 @@
+node_modules/
+dist/
+
+runtime/
+versions/
+assets/indexes/
+assets/objects/
+assets/skins/
+libraries/
+
+config/app.json
+temp_config.zip
+*.log
+
+.DS_Store
+Thumbs.db
