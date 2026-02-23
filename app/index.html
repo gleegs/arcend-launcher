@@ -2,36 +2,168 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arcend Launcher</title>
-    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="container" id="main-ui">
-        <h1>ARCEND</h1>
-      
-        <div class="settings-group">
-            <label style="display: block; margin-bottom: 10px;">RAM : <span id="ramValue">...</span> GB</label>
-            <input id="ramSlider" type="range" min="2" max="12" step="1">
-        </div>
-      
-        <button id="playBtn">JOUER</button>
+    <div class="launcherWrapper">
+        
+        <aside class="sidebarBar">
+            <div class="sidebarTop">
+                <img src="assets/images/black-logo.png" alt="Logo Arcend" class="logoIcon">
+                <h1 class="panelTitle">ARCEND<br>SERVER<br>PANEL</h1>
+                
+                <div class="connectedCategory">
+                    <div class="serverStatus">
+                        <span class="playerCount">0/50<span class="statusDot"></span></span>
+                        <span class="statusText">CONNECTÉS</span>
+                    </div>
+                
+                    <div class="playerGrid">
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div><div class="head"></div>
+                        <div class="head"></div><div class="head"></div>
+                    </div>
+                </div>
+            </div>
+        
+            <div class="sidebarBottom">
+                <span class="versionLabel">VERSION</span>
+                <div class="versionBadge">v0.1.1</div>
+            </div>
+        </aside>
+
+        <main class="mainContent">
+            
+            <div class="logoContainer">
+                <img src="assets/images/sunset-logo.png" alt="Arcend" class="logoImg">
+                <h2 class="logoText">ARCEND</h2>
+            </div>
+
+            <div class="topBar">
+                <button class="btnConnect" id="btnAuth" data-state="logged-out">
+                    <div class="authState auth-login">
+                        SE CONNECTER 
+                        <img src="assets/icons/login-icon.svg" alt="Login" class="btnIcon">
+                    </div>
+                    <div class="authState auth-profile">
+                        <span id="playerName">PLAYER</span>
+                        <img src="" alt="Head" id="playerHead" class="playerHeadIcon">
+                    </div>
+                    <div class="authState auth-logout">
+                        SE DÉCONNECTER ?
+                        <img src="assets/icons/login-icon.svg" alt="Logout" class="btnIcon" style="transform: scaleX(-1);">
+                    </div>
+                </button>
+                
+                <div class="buttonsGroup">
+                    <button class="iconBtn btnParams">
+                        <img src="assets/icons/settings-icon.svg" alt="Paramètres">
+                    </button>
+                    <button class="iconBtn btnMinus">
+                        <img src="assets/icons/minus-icon.svg" alt="Réduire">
+                    </button>
+                    <button class="iconBtn btnClose">
+                        <img src="assets/icons/cross-icon.svg" alt="Fermer">
+                    </button>
+                </div>
+            </div>
+
+            <div class="sideLinks">
+                <button class="iconBtn linkBtn">
+                    <img src="assets/icons/web-icon.svg" alt="Web">
+                </button>
+                <button class="iconBtn linkBtn">
+                    <img src="assets/icons/discord-icon.svg" alt="Discord">
+                </button>
+            </div>
+
+            <div class="logsPanel">
+                <h3>LOGS</h3>
+                <div class="logsText">
+                    </div>
+            </div>
+
+            <button class="buttonPlay disabled" id="playBtn">
+                JOUER 
+                <img src="assets/icons/play-icon.svg" alt="Play" class="btnIconPlay">
+            </button>
+
+            <div class="loaderContainer" id="loaderContainer">
+                <div class="progressBarTrack">
+                    <div class="progressBarFill" id="progressBar"></div>
+                </div>
+                <div class="loaderLabel">
+                    CHARGEMENT
+                    <img src="assets/icons/load-icon.svg" alt="Loading" class="loaderIcon">
+                </div>
+            </div>
+
+            <div class="settingsPanel">
+                <button class="iconBtn settingsCloseBtn">
+                    <img src="assets/icons/cross-icon.svg" alt="Fermer Paramètres" style="filter: invert(1);">
+                </button>
+                
+                <div class="settingsContent">
+                    
+                    <div class="settingGroup">
+                        <h3 class="settingTitle">RAM ALLOUÉE</h3>
+                        <p class="settingDesc">AJUSTER LA MÉMOIRE ALLOUÉE À VOTRE JEU</p>
+                        <input type="range" min="2" max="16" value="8" class="ramSlider" id="ramSlider">
+                        <span class="settingHint" id="ramHint">SÉLECTIONNÉ : 8GO (CONSEILLÉ : 8GO)</span>
+                    </div>
+
+                    <div class="settingGroup">
+                        <h3 class="settingTitle">CONSOLE</h3>
+                        <p class="settingDesc">AFFICHER LA CONSOLE DE LOGS</p>
+                        <label class="toggleSwitch">
+                            <input type="checkbox" id="consoleToggle">
+                            <span class="toggleSlider"></span>
+                        </label>
+                    </div>
+
+                    <div class="settingGroup">
+                        <h3 class="settingTitle">DOSSIER DU JEU</h3>
+                        <p class="settingDesc">OUVRIR LE DOSSIER DU JEU</p>
+                        <button class="btnOpenFolder" id="btnOpenGame">
+                            OUVRIR <img src="assets/icons/open-icon.svg" alt="Ouvrir">
+                        </button>
+                    </div>
+
+                    <div class="settingGroup">
+                        <h3 class="settingTitle">DOSSIER DU LAUNCHER</h3>
+                        <p class="settingDesc">OUVRIR LE DOSSIER DU LAUNCHER</p>
+                        <button class="btnOpenFolder" id="btnOpenLauncher">
+                            OUVRIR <img src="assets/icons/open-icon.svg" alt="Ouvrir">
+                        </button>
+                    </div>
+
+                    <div class="settingGroup">
+                        <h3 class="settingTitle">VERSION DU LAUNCHER</h3>
+                        <p class="settingVersion">0.1.1</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
     </div>
 
-    <div id="loader-container" style="display: none;">
-        <div style="display: flex; justify-content: space-between; color: #ccc; font-size: 13px;">
-            <span id="status-text">Initialisation...</span>
-            <span id="percent-text">0%</span>
-        </div>
-        <div class="progress-bg">
-            <div id="progress-bar"></div>
-        </div>
-    </div>
-
-    <div id="debug-console"><div>[Système] Prêt.</div></div>
-    <div id="launcher-version">V.0.0.0</div>
-
-    <script src="./script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
