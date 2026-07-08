@@ -62,6 +62,10 @@ const {
   mockHttpGet: vi.fn(),
 }))
 
+const { mockApp } = vi.hoisted(() => ({
+  mockApp: { isPackaged: false },
+}))
+
 vi.mock('node:fs', () => {
   const fns = {
     existsSync: (...args: unknown[]) => mockFsExistsSync(...args),
@@ -100,6 +104,10 @@ vi.mock('node:http', () => {
   }
   return { __esModule: true, default: fns, ...fns }
 })
+
+vi.mock('electron', () => ({
+  app: mockApp,
+}))
 
 const sampleMetadata = {
   arcId: 'test-arc',
@@ -185,6 +193,8 @@ describe('arc service', () => {
     mockEnsureJava.mockReset()
     mockGetJavaExecutable.mockReset()
     mockGetMainWindow.mockReturnValue(null)
+    mockApp.isPackaged = false
+    delete process.env.ARCEND_PACK_TOML_URL
   })
 
   describe('getRegistry', () => {
@@ -714,6 +724,96 @@ describe('arc service', () => {
       expect(folderIdx).toBeGreaterThanOrEqual(0)
       expect(javaIdx).toBeLessThan(packwizIdx)
       expect(packwizIdx).toBeLessThan(folderIdx)
+    })
+
+    it('uses ARCEND_PACK_TOML_URL override in dev mode', async () => {
+      setupSpawnExit(0)
+      const overrideUrl = 'http://localhost:8080/pack.toml'
+      process.env.ARCEND_PACK_TOML_URL = overrideUrl
+      mockApp.isPackaged = false
+      mockHttpGet.mockImplementation(mockHttpResponse({ data: 'minecraft = "1.20.1"' }))
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcsDir) return true
+        if (p === fakeArcRegistryPath) return true
+        if (p === fakeConfigDir) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return JSON.stringify({ installations: {} })
+        return ''
+      })
+      mockFsReaddirSync.mockReturnValue([])
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+
+      const metadataNoVersion = { ...sampleMetadata, mcVersion: '' }
+      const { installArc } = await import('./arc')
+      const result = await installArc('test-arc', metadataNoVersion)
+
+      // Version résolue depuis le pack.toml local servi par `packwiz serve`
+      expect(result.metadata.mcVersion).toBe('1.20.1')
+      expect(mockHttpGet).toHaveBeenCalledWith(overrideUrl, expect.any(Function))
+      expect(mockHttpsGet).not.toHaveBeenCalled()
+
+      // packwiz spawné avec l'URL d'override comme source
+      expect(mockSpawn).toHaveBeenCalled()
+      const spawnArgs = mockSpawn.mock.calls[0][1] as string[]
+      expect(spawnArgs[spawnArgs.length - 1]).toBe(overrideUrl)
+    })
+
+    it('ignores ARCEND_PACK_TOML_URL override in packaged build', async () => {
+      setupSpawnExit(0)
+      process.env.ARCEND_PACK_TOML_URL = 'http://localhost:8080/pack.toml'
+      mockApp.isPackaged = true
+      mockHttpsGet.mockImplementation(mockHttpResponse({ data: 'minecraft = "1.20.1"' }))
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcsDir) return true
+        if (p === fakeArcRegistryPath) return true
+        if (p === fakeConfigDir) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return JSON.stringify({ installations: {} })
+        return ''
+      })
+      mockFsReaddirSync.mockReturnValue([])
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+
+      const metadataNoVersion = { ...sampleMetadata, mcVersion: '' }
+      const { installArc } = await import('./arc')
+      await installArc('test-arc', metadataNoVersion)
+
+      // L'URL distante d'origine est utilisée, l'override est ignoré.
+      expect(mockHttpsGet).toHaveBeenCalledWith(
+        'https://example.com/pack.toml',
+        expect.any(Function)
+      )
+      expect(mockHttpGet).not.toHaveBeenCalled()
+      const spawnArgs = mockSpawn.mock.calls[0][1] as string[]
+      expect(spawnArgs[spawnArgs.length - 1]).toBe('https://example.com/pack.toml')
     })
   })
 

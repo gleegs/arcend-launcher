@@ -3,6 +3,7 @@ import path from 'node:path'
 import https from 'node:https'
 import http from 'node:http'
 import { spawn } from 'node:child_process'
+import { app } from 'electron'
 import { getMainWindow } from './window'
 import { IpcChannels } from '../types/ipc'
 import { arcsDir, arcRegistryPath } from '../lib/paths'
@@ -277,10 +278,25 @@ function parsePackToml(content: string): { mcVersion: string } {
   return { mcVersion: mcVersionMatch[1] }
 }
 
+/**
+ * Résout la source du `pack.toml` utilisée par packwiz et pour la lecture de la
+ * version Minecraft. En mode DEV (`!app.isPackaged`), la variable
+ * d'environnement `ARCEND_PACK_TOML_URL` permet de pointer vers un `pack.toml`
+ * local servi par `packwiz serve` (ex: http://localhost:8080/pack.toml) afin de
+ * tester un modpack sans dépendre de l'URL distante configurée dans Supabase.
+ */
+function getPackTomlSource(metadata: ArcMetadata): string {
+  const override = process.env.ARCEND_PACK_TOML_URL
+  if (override && !app.isPackaged) {
+    return override
+  }
+  return metadata.packwizUrl
+}
+
 async function resolveMetadata(metadata: ArcMetadata): Promise<ArcMetadata> {
   if (metadata.mcVersion) return metadata
 
-  const packToml = await fetchText(metadata.packwizUrl)
+  const packToml = await fetchText(getPackTomlSource(metadata))
   const { mcVersion } = parsePackToml(packToml)
 
   return { ...metadata, mcVersion }
@@ -314,7 +330,7 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     sendProgress({ arcId, percent: 25, status: 'syncing_packwiz', modsDownloaded: 0 })
 
-    await runPackwiz(mcPath, resolvedMetadata.packwizUrl, ({ current, total }) => {
+    await runPackwiz(mcPath, getPackTomlSource(resolvedMetadata), ({ current, total }) => {
       sendProgress({
         arcId,
         percent: computeModsPercent(current, total),
@@ -372,7 +388,7 @@ export async function syncArcModpack(arcId: string, signal?: AbortSignal): Promi
   const mcPath = path.join(getArcPath(arcId), 'minecraft')
   await ensureJava('21')
   await ensurePackwiz()
-  await runPackwiz(mcPath, installation.metadata.packwizUrl, undefined, signal)
+  await runPackwiz(mcPath, getPackTomlSource(installation.metadata), undefined, signal)
 }
 
 export function uninstallArc(arcId: string): void {
