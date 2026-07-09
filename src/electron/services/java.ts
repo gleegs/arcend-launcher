@@ -36,8 +36,11 @@ function sendLog(level: LogLevel, message: string): void {
   }
 }
 
-function getArch(): string {
-  return process.arch === 'arm64' ? 'arm64' : 'x64'
+// Adoptium nomme l'ARM « aarch64 » (pas « arm64 » comme Node.js). Une requête
+// avec architecture=arm64 répond 404. On traduit donc process.arch vers le
+// vocabulaire Adoptium.
+function getAdoptiumArch(): string {
+  return process.arch === 'arm64' ? 'aarch64' : 'x64'
 }
 
 export function getRegistry(): JavaRegistry {
@@ -102,8 +105,12 @@ interface AdoptiumAsset {
   }
 }
 
+function buildApiError(version: string, arch: string, platform: string, status: number): Error {
+  return new Error(`Adoptium API returned ${status} for ${arch}/${platform}/jre/Java ${version}`)
+}
+
 async function fetchJreDownloadUrl(version: string): Promise<{ url: string; size: number }> {
-  const arch = getArch()
+  const arch = getAdoptiumArch()
   const platform =
     process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
   const imageType = 'jre'
@@ -121,6 +128,9 @@ async function fetchJreDownloadUrl(version: string): Promise<{ url: string; size
         ) {
           const redirectUrl = res.headers.location
           https.get(redirectUrl, (redirectRes) => {
+            if (redirectRes.statusCode && redirectRes.statusCode >= 400) {
+              return reject(buildApiError(version, arch, platform, redirectRes.statusCode))
+            }
             let data = ''
             redirectRes.on('data', (chunk) => (data += chunk))
             redirectRes.on('end', () => {
@@ -135,12 +145,20 @@ async function fetchJreDownloadUrl(version: string): Promise<{ url: string; size
                   size: asset.binary.package.size,
                 })
               } catch {
-                reject(new Error(`Failed to parse Adoptium API response for Java ${version}`))
+                reject(
+                  new Error(
+                    `Failed to parse Adoptium API response for Java ${version} (${arch}/${platform})`
+                  )
+                )
               }
             })
             redirectRes.on('error', reject)
           })
           return
+        }
+
+        if (res.statusCode && res.statusCode >= 400) {
+          return reject(buildApiError(version, arch, platform, res.statusCode))
         }
 
         let data = ''
@@ -157,7 +175,11 @@ async function fetchJreDownloadUrl(version: string): Promise<{ url: string; size
               size: asset.binary.package.size,
             })
           } catch {
-            reject(new Error(`Failed to parse Adoptium API response for Java ${version}`))
+            reject(
+              new Error(
+                `Failed to parse Adoptium API response for Java ${version} (${arch}/${platform})`
+              )
+            )
           }
         })
         res.on('error', reject)
@@ -344,12 +366,13 @@ export async function installJava(version: string): Promise<JavaInstallation> {
 
     const installPath = await extractJre(tempArchive, version)
 
-    const arch = getArch()
+    // Le registre stocke l'arch machine réelle (ex: arm64). La traduction vers
+    // aarch64 (vocabulaire Adoptium) ne sert qu'à fetchJreDownloadUrl.
     const installation: JavaInstallation = {
       version,
       path: installPath,
       installedAt: new Date().toISOString(),
-      arch,
+      arch: process.arch,
     }
 
     const registry = getRegistry()
@@ -357,7 +380,7 @@ export async function installJava(version: string): Promise<JavaInstallation> {
     saveRegistry(registry)
 
     sendProgress({ version, percent: 100, status: 'done' })
-    sendLog('info', `Java ${version} installé (${arch}).`)
+    sendLog('info', `Java ${version} installé (${process.arch}).`)
 
     return installation
   } catch (error) {
