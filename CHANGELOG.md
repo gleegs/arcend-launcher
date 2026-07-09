@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.2](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.1...v2.3.2) (2026-07-09)
+
+### Features
+
+- **arc:** support local pack.toml via ARCEND_PACK_TOML_URL in dev ([01e7e54](https://github.com/gleegs/arcend-launcher-v2/commit/01e7e544dbffa90ac02ca210493b1be186a0afe2))
+- **build:** add appImage build ([#61](https://github.com/gleegs/arcend-launcher-v2/issues/61)) ([05f6eb8](https://github.com/gleegs/arcend-launcher-v2/commit/05f6eb805306cc659af4a0e0721aa695e937d038))
+
+### Bug Fixes
+
+- **java:** flatten macOS bundle layout so bin/java resolves ([aed9773](https://github.com/gleegs/arcend-launcher-v2/commit/aed9773613814dfef02b57436bbcd0d5d1547785))
+- **java:** resolve macOS modpack install crash ([#60](https://github.com/gleegs/arcend-launcher-v2/issues/60)) ([3de8b3a](https://github.com/gleegs/arcend-launcher-v2/commit/3de8b3a31fe88d5cf2004d07384c64f2dda957a3))
+- **java:** resolve macOS modpack install crash at Java step ([e77bdfe](https://github.com/gleegs/arcend-launcher-v2/commit/e77bdfe53baa91fe81013ff9714aa6f3998d2dd5))
+- **java:** use aarch64 for Adoptium API on Apple Silicon ([e93681a](https://github.com/gleegs/arcend-launcher-v2/commit/e93681a999fd9946f593059ad61c8a96aad8f06b))
+
 ### [2.3.1](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.0...v2.3.1) (2026-06-30)
 
 ### Features

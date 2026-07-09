@@ -1,7 +1,7 @@
 {
   "name": "arcend-launcher",
   "productName": "Arcend Launcher",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Arcend Game Launcher",
   "license": "UNLICENSED",
   "main": ".vite/build/main.js",
