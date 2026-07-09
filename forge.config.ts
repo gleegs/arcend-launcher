@@ -6,6 +6,7 @@ import { MakerDeb } from '@electron-forge/maker-deb'
 import { MakerRpm } from '@electron-forge/maker-rpm'
 import { VitePlugin } from '@electron-forge/plugin-vite'
 import { PublisherGithub } from '@electron-forge/publisher-github'
+import { MakerAppImage } from '@reforged/maker-appimage'
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -38,6 +39,14 @@ const config: ForgeConfig = {
         icon: 'build/icon.png',
         name: 'arcend-launcher',
         productName: 'Arcend Launcher',
+        categories: ['Game'],
+      },
+    }),
+    new MakerAppImage({
+      options: {
+        name: 'arcend-launcher',
+        productName: 'Arcend Launcher',
+        icon: 'build/icon.png',
         categories: ['Game'],
       },
     }),
