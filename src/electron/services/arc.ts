@@ -163,11 +163,12 @@ function computeModsPercent(current: number, total: number): number {
 async function runPackwiz(
   mcPath: string,
   packwizUrl: string,
+  javaVersion: string,
   onProgress?: (progress: PackwizProgress) => void,
   signal?: AbortSignal
 ): Promise<void> {
   const packwizJar = getJarPath()
-  const javaPath = getJavaExecutable('21')
+  const javaPath = getJavaExecutable(javaVersion)
 
   return new Promise((resolve, reject) => {
     const args = ['-Dfile.encoding=UTF-8', '-jar', packwizJar, '--no-gui', packwizUrl]
@@ -316,7 +317,8 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
     // `ensurePackwiz` ne fait que télécharger un jar (~99 Ko), il n'a pas
     // besoin de Java pour s'exécuter. On peut donc le faire APRÈS ensureJava
     // sans dépendance, ce qui évite la régression visuelle Packwiz → Java.
-    await ensureJava('21')
+    const javaVersion = metadata.javaVersion || '21'
+    await ensureJava(javaVersion)
     await ensurePackwiz()
 
     sendProgress({ arcId, percent: 0, status: 'creating_folder' })
@@ -330,15 +332,20 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     sendProgress({ arcId, percent: 25, status: 'syncing_packwiz', modsDownloaded: 0 })
 
-    await runPackwiz(mcPath, getPackTomlSource(resolvedMetadata), ({ current, total }) => {
-      sendProgress({
-        arcId,
-        percent: computeModsPercent(current, total),
-        status: 'syncing_packwiz',
-        modsDownloaded: current,
-        modsTotal: total,
-      })
-    })
+    await runPackwiz(
+      mcPath,
+      getPackTomlSource(resolvedMetadata),
+      resolvedMetadata.javaVersion,
+      ({ current, total }) => {
+        sendProgress({
+          arcId,
+          percent: computeModsPercent(current, total),
+          status: 'syncing_packwiz',
+          modsDownloaded: current,
+          modsTotal: total,
+        })
+      }
+    )
 
     sendProgress({ arcId, percent: 75, status: 'creating_metadata' })
 
@@ -363,12 +370,14 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     return installation
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    sendPackwizLog('error', `Échec de l'installation : ${message}`)
     cleanupArcInstall(arcId, arcPath)
     sendProgress({
       arcId,
       percent: 0,
       status: 'error',
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
     })
     throw error
   }
@@ -386,9 +395,10 @@ export async function syncArcModpack(arcId: string, signal?: AbortSignal): Promi
     throw new Error(`Arc "${arcId}" n'est pas installé.`)
   }
   const mcPath = path.join(getArcPath(arcId), 'minecraft')
-  await ensureJava('21')
+  const javaVersion = installation.metadata.javaVersion || '21'
+  await ensureJava(javaVersion)
   await ensurePackwiz()
-  await runPackwiz(mcPath, getPackTomlSource(installation.metadata), undefined, signal)
+  await runPackwiz(mcPath, getPackTomlSource(installation.metadata), javaVersion, undefined, signal)
 }
 
 export function uninstallArc(arcId: string): void {
