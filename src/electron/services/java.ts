@@ -90,9 +90,13 @@ export function getJavaExecutable(version: string): string {
   const registry = getRegistry()
   const entry = registry.installations[version]
   const exe = process.platform === 'win32' ? 'java.exe' : 'java'
-  const executablePath = path.join(entry.path, 'bin', exe)
-  if (fs.existsSync(executablePath)) return executablePath
-  throw new Error(`Java executable not found at ${executablePath}`)
+  const flatPath = path.join(entry.path, 'bin', exe)
+  if (fs.existsSync(flatPath)) return flatPath
+  // Fallback bundle macOS : anciennes installs Java extraites avant la
+  // normalisation du layout (java-XX/Contents/Home/bin/java).
+  const bundlePath = path.join(entry.path, 'Contents', 'Home', 'bin', exe)
+  if (fs.existsSync(bundlePath)) return bundlePath
+  throw new Error(`Java executable not found at ${flatPath}`)
 }
 
 interface AdoptiumAsset {
@@ -279,6 +283,22 @@ function flattenSingleNestedDir(installPath: string): void {
   }
 }
 
+// Layout bundle macOS d'Adoptium : <installPath>/Contents/Home/{bin,lib,…}.
+// On remonte le contenu de Contents/Home directement sous installPath pour
+// retrouver la structure plate attendue partout ailleurs (installPath/bin),
+// identique à Windows. Sans ça, getJavaExecutable cherche bin/java sous
+// installPath et rate le binaire (qui est sous Contents/Home/bin). Spécifique
+// à macOS : les tarballs Linux sont déjà plats.
+function flattenMacosBundle(installPath: string): void {
+  if (process.platform !== 'darwin') return
+  const home = path.join(installPath, 'Contents', 'Home')
+  if (!fs.existsSync(home) || !fs.statSync(home).isDirectory()) return
+  for (const item of fs.readdirSync(home)) {
+    fs.renameSync(path.join(home, item), path.join(installPath, item))
+  }
+  fs.rmSync(path.join(installPath, 'Contents'), { recursive: true, force: true })
+}
+
 // macOS/Linux : les binaires Java (bin/java, jspawnhelper, …) doivent être
 // exécutables. tar préserve normalement les bits Unix, mais on force le 0o755
 // pour blinder tous les chemins d'extraction.
@@ -336,6 +356,7 @@ async function extractJre(archivePath: string, version: string): Promise<string>
   }
 
   flattenSingleNestedDir(installPath)
+  flattenMacosBundle(installPath)
   makeBinariesExecutable(installPath)
 
   sendProgress({ version, percent: 100, status: 'extracting' })
