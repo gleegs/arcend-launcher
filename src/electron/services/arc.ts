@@ -363,12 +363,14 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     return installation
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    sendPackwizLog('error', `Échec de l'installation : ${message}`)
     cleanupArcInstall(arcId, arcPath)
     sendProgress({
       arcId,
       percent: 0,
       status: 'error',
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
     })
     throw error
   }
