@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/auth'
 export default function AuthButton() {
   const state = useAuthStore((s) => s.state)
   const isLoading = useAuthStore((s) => s.isLoading)
+  const error = useAuthStore((s) => s.error)
   const login = useAuthStore((s) => s.login)
   const logout = useAuthStore((s) => s.logout)
   const init = useAuthStore((s) => s.init)
@@ -70,13 +71,20 @@ export default function AuthButton() {
   }
 
   return (
-    <Button
-      className="flex justify-center items-center gap-2 min-w-48"
-      disabled={isLoading}
-      onClick={login}
-    >
-      <span className="uppercase font-black text-xs">Se connecter</span>
-      <LogIn className="text-white" />
-    </Button>
+    <div className="flex flex-col items-center gap-1">
+      <Button
+        className="flex justify-center items-center gap-2 min-w-48"
+        disabled={isLoading}
+        onClick={login}
+      >
+        <span className="uppercase font-black text-xs">Se connecter</span>
+        <LogIn className="text-white" />
+      </Button>
+      {error && (
+        <span className="text-[10px] text-red-400 max-w-48 text-center" title={error}>
+          Connexion échouée — voir les logs
+        </span>
+      )}
+    </div>
   )
 }
