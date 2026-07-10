@@ -71,20 +71,21 @@ export default function AuthButton() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <Button
-        className="flex justify-center items-center gap-2 min-w-48"
-        disabled={isLoading}
-        onClick={login}
-      >
-        <span className="uppercase font-black text-xs">Se connecter</span>
-        <LogIn className="text-white" />
-      </Button>
+    <Button
+      className="flex justify-center items-center gap-2 min-w-48 relative"
+      disabled={isLoading}
+      onClick={login}
+    >
+      <span className="uppercase font-black text-xs">Se connecter</span>
+      <LogIn className="text-white" />
       {error && (
-        <span className="text-[10px] text-red-400 max-w-48 text-center" title={error}>
+        <span
+          className="absolute top-full left-0 right-0 mt-1 text-[10px] text-red-400 text-center"
+          title={error}
+        >
           Connexion échouée — voir les logs
         </span>
       )}
-    </div>
+    </Button>
   )
 }
