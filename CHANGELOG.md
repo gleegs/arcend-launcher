@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.3](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.2...v2.3.3) (2026-07-10)
+
+### Bug Fixes
+
+- **auth:** isolate Microsoft login session and surface login failures ([c8403b4](https://github.com/gleegs/arcend-launcher-v2/commit/c8403b4ef5e0dd0b1fe8b6f8661766d5e5ac0ce8))
+
 ### [2.3.2](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.1...v2.3.2) (2026-07-09)
 
 ### Features
