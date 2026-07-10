@@ -243,6 +243,55 @@ async function runPackwiz(
   })
 }
 
+// Un modpack peut faire des dizaines de requêtes HTTP (une par mod). Il suffit
+// qu'une seule expire (SocketTimeoutException) pour que packwiz sorte en erreur
+// et fasse échouer toute l'installation. Ces timeouts sont quasi toujours
+// transitoires côté réseau du joueur.
+const PACKWIZ_MAX_ATTEMPTS = 3
+const PACKWIZ_RETRY_DELAY_MS = 2000
+
+/** `true` si l'erreur packwiz ressemble à une panne réseau transitoire (donc ré-essayable). */
+function isTransientPackwizError(message: string): boolean {
+  return /SocketTimeoutException|SocketException|timeout|Connection reset|UnknownHostException|RequestFailed|HTTP request failed|failed to connect|Read timed out/i.test(
+    message
+  )
+}
+
+/**
+ * Exécute packwiz avec retry sur les erreurs réseau transitoires. packwiz étant
+ * incrémental (il ne re-télécharge que les fichiers manquants), relancer après un
+ * timeout reprend là où ça s'est arrêté. On ne ré-essaie pas si l'utilisateur a
+ * annulé (signal aborté) ni sur une erreur non réseau (ex. pack.toml invalide).
+ */
+async function runPackwizWithRetry(
+  mcPath: string,
+  packwizUrl: string,
+  javaVersion: string,
+  onProgress?: (progress: PackwizProgress) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= PACKWIZ_MAX_ATTEMPTS; attempt++) {
+    try {
+      await runPackwiz(mcPath, packwizUrl, javaVersion, onProgress, signal)
+      return
+    } catch (error) {
+      lastError = error
+      const message = error instanceof Error ? error.message : String(error)
+
+      if (signal?.aborted) throw error
+      if (attempt >= PACKWIZ_MAX_ATTEMPTS || !isTransientPackwizError(message)) throw error
+
+      sendPackwizLog(
+        'warn',
+        `[packwiz] Échec réseau (tentative ${attempt}/${PACKWIZ_MAX_ATTEMPTS}), nouvelle tentative dans ${PACKWIZ_RETRY_DELAY_MS / 1000}s…`
+      )
+      await new Promise((r) => setTimeout(r, PACKWIZ_RETRY_DELAY_MS))
+    }
+  }
+  throw lastError
+}
+
 function fetchText(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http
@@ -332,7 +381,7 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     sendProgress({ arcId, percent: 25, status: 'syncing_packwiz', modsDownloaded: 0 })
 
-    await runPackwiz(
+    await runPackwizWithRetry(
       mcPath,
       getPackTomlSource(resolvedMetadata),
       resolvedMetadata.javaVersion,
@@ -398,7 +447,13 @@ export async function syncArcModpack(arcId: string, signal?: AbortSignal): Promi
   const javaVersion = installation.metadata.javaVersion || '21'
   await ensureJava(javaVersion)
   await ensurePackwiz()
-  await runPackwiz(mcPath, getPackTomlSource(installation.metadata), javaVersion, undefined, signal)
+  await runPackwizWithRetry(
+    mcPath,
+    getPackTomlSource(installation.metadata),
+    javaVersion,
+    undefined,
+    signal
+  )
 }
 
 export function uninstallArc(arcId: string): void {

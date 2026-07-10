@@ -152,6 +152,30 @@ function setupSpawnWithStdout(code: number, stdoutChunks: string[]) {
   }))
 }
 
+/**
+ * Fait échouer les `failCount` premiers spawns packwiz (code de sortie + stderr
+ * réseau), puis réussit. Sert à tester le retry sur timeouts transitoires.
+ */
+function setupSpawnFailThenSucceed(failCount: number, stderr: string) {
+  let call = 0
+  mockSpawn.mockImplementation(() => {
+    const code = call < failCount ? 1 : 0
+    const emitStderr = call < failCount
+    call++
+    return {
+      stdout: { on: vi.fn() },
+      stderr: {
+        on: vi.fn((event: string, cb: (data: Buffer) => void) => {
+          if (event === 'data' && emitStderr) cb(Buffer.from(stderr))
+        }),
+      },
+      on: vi.fn((event: string, cb: (c: number | null) => void) => {
+        if (event === 'close') setTimeout(() => cb(code), 0)
+      }),
+    }
+  })
+}
+
 function mockHttpResponse(options: {
   statusCode?: number
   headers?: Record<string, string>
@@ -591,6 +615,75 @@ describe('arc service', () => {
       )
 
       expect(mockFsRmSync).toHaveBeenCalled()
+    })
+
+    it('retries packwiz on transient network timeout then succeeds', async () => {
+      // 2 échecs réseau puis succès : le retry doit rattraper l'install.
+      setupSpawnFailThenSucceed(2, 'java.net.SocketTimeoutException: timeout')
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcsDir) return true
+        if (p === fakeArcRegistryPath) return true
+        if (p === fakeConfigDir) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return JSON.stringify({ installations: {} })
+        return ''
+      })
+      mockFsReaddirSync.mockReturnValue([])
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+
+      const { installArc } = await import('./arc')
+      const result = await installArc('test-arc', sampleMetadata)
+
+      expect(result.arcId).toBe('test-arc')
+      expect(mockSpawn).toHaveBeenCalledTimes(3)
+    })
+
+    it('does not retry non-network packwiz failures', async () => {
+      setupSpawnExit(1, { stderr: 'pack.toml: invalid TOML syntax' })
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcsDir) return true
+        if (p === fakeArcRegistryPath) return true
+        if (p === fakeConfigDir) return true
+        if (p.includes('test-arc')) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return JSON.stringify({ installations: {} })
+        return ''
+      })
+      mockFsReaddirSync.mockReturnValue([])
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+
+      const { installArc } = await import('./arc')
+      await expect(installArc('test-arc', sampleMetadata)).rejects.toThrow(/invalid TOML/)
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1)
     })
 
     it('emits mod download progress during packwiz sync', async () => {
