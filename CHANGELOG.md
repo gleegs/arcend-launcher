@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.5](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.4...v2.3.5) (2026-07-10)
+
+### Bug Fixes
+
+- **arc:** retry packwiz on transient network timeouts ([6f127ba](https://github.com/gleegs/arcend-launcher-v2/commit/6f127bae3a86a709db8bf3dadee5b6e7b0305d43))
+
 ### [2.3.4](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.3...v2.3.4) (2026-07-10)
 
 ### Bug Fixes
