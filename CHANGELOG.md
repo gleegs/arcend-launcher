@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.4](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.3...v2.3.4) (2026-07-10)
+
+### Bug Fixes
+
+- **auth:** keep login button size, show error below it ([a802b6d](https://github.com/gleegs/arcend-launcher-v2/commit/a802b6d2ed0c498ed6f64cce97e7c102002470ba))
+
 ### [2.3.3](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.2...v2.3.3) (2026-07-10)
 
 ### Bug Fixes
