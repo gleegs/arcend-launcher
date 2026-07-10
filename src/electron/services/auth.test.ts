@@ -4,7 +4,19 @@ const mockEncryptString = vi.fn()
 const mockDecryptString = vi.fn()
 const mockIsEncryptionAvailable = vi.fn()
 
+const mockClearStorageData = vi.fn()
+
 vi.mock('electron', () => ({
+  app: {
+    on: vi.fn(),
+    removeListener: vi.fn(),
+    getPath: vi.fn(() => {
+      throw new Error('no logs dir in tests')
+    }),
+  },
+  session: {
+    fromPartition: vi.fn(() => ({ clearStorageData: () => mockClearStorageData() })),
+  },
   safeStorage: {
     encryptString: (...args: unknown[]) => mockEncryptString(...args),
     decryptString: (...args: unknown[]) => mockDecryptString(...args),
@@ -70,8 +82,32 @@ describe('auth service', () => {
       expect(mockAuthLaunch).toHaveBeenCalledWith('electron', {
         width: 500,
         height: 650,
+        resizable: false,
         parent: undefined,
+        webPreferences: { partition: 'msmc-login' },
       })
+    })
+
+    it('normalises the string errors thrown by msmc', async () => {
+      mockGetMainWindow.mockReturnValue(null)
+      mockAuthLaunch.mockRejectedValue('error.gui.closed')
+
+      const { login } = await import('./auth')
+      await expect(login()).rejects.toThrow(/error\.gui\.closed/)
+    })
+
+    it('normalises the { response, ts } errors thrown by msmc', async () => {
+      mockGetMainWindow.mockReturnValue(null)
+      mockAuthLaunch.mockRejectedValue({
+        ts: 'error.auth.minecraft.login',
+        response: { status: 403, statusText: 'Forbidden', text: async () => 'NOT_FOUND' },
+      })
+
+      const { login } = await import('./auth')
+      // Avant : `String(error)` donnait "[object Object]".
+      await expect(login()).rejects.toThrow(
+        'error.auth.minecraft.login (HTTP 403 Forbidden — NOT_FOUND)'
+      )
     })
 
     it('throws if no minecraft profile', async () => {
@@ -92,6 +128,13 @@ describe('auth service', () => {
 
       expect(mockSetConfig).toHaveBeenCalledWith('encryptedRefreshToken', undefined)
       expect(mockSetConfig).toHaveBeenCalledWith('cachedProfile', undefined)
+    })
+
+    it('clears the Microsoft login cookies so the account can be switched', async () => {
+      const { logout } = await import('./auth')
+      await logout()
+
+      expect(mockClearStorageData).toHaveBeenCalled()
     })
   })
 
