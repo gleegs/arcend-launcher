@@ -11,6 +11,7 @@ import type { CachedProfile } from '../types/ipc'
 import { getConfig } from './store'
 import { auth, decryptToken } from './auth'
 import { getArcPath, getRegistry as getArcRegistry, syncArcModpack } from './arc'
+import { migrateKeybinds } from './keybindsMigration'
 import { ensureJava, getJavaExecutable } from './java'
 import type {
   LaunchOptions,
@@ -224,6 +225,26 @@ async function runLaunch(options: LaunchOptions, abort: AbortController): Promis
 
   if (abort.signal.aborted) {
     return
+  }
+
+  // Reset one-shot des touches (voir keybindsMigration.ts) : corrige les joueurs
+  // dont le options.txt a été pollué (mod "Better Options") avant la mise en
+  // place de keybindings.txt. Non bloquant : en cas d'échec on lance quand même.
+  try {
+    const km = migrateKeybinds(mcPath)
+    if (km.status === 'reset') {
+      sendLog(
+        'info',
+        `Touches réinitialisées aux défauts du pack (${km.removed} lignes, backup : ${path.basename(km.backupPath)})`,
+        'launcher'
+      )
+    }
+  } catch (error) {
+    sendLog(
+      'warn',
+      `Migration des touches ignorée : ${error instanceof Error ? error.message : String(error)}`,
+      'launcher'
+    )
   }
 
   sendProgress({ status: 'validating_auth', percent: 10 })
