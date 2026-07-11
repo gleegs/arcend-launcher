@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.6](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.5...v2.3.6) (2026-07-11)
+
+### Bug Fixes
+
+- **launcher:** one-shot keybinds reset to clear Better Options pollution ([fa42929](https://github.com/gleegs/arcend-launcher-v2/commit/fa42929541188dca87450fd1f45b31e51c34c893))
+
 ### [2.3.5](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.4...v2.3.5) (2026-07-10)
 
 ### Bug Fixes
