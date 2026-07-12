@@ -1,8 +1,8 @@
 import { GameDig } from 'gamedig'
 import type { ServerStatus } from '../types/server'
 
-// Serveur Minecraft Java Arcend (cf. play.arcend.fr).
-const HOST = process.env.ARCEND_SERVER_HOST || 'play.arcend.fr'
+// Serveur Minecraft Java Arcend (nouvelle IP depuis le changement de serveur).
+const HOST = process.env.ARCEND_SERVER_HOST || '51.38.180.149'
 const PORT = Number(process.env.ARCEND_SERVER_PORT) || 25565
 
 /**
