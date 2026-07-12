@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.7](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.6...v2.3.7) (2026-07-12)
+
+### Bug Fixes
+
+- **server:** update Arcend server IP after migration ([987891e](https://github.com/gleegs/arcend-launcher-v2/commit/987891ebc2dcebfb7a9a321dc8eb4c10f37d371a))
+
 ### [2.3.6](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.5...v2.3.6) (2026-07-11)
 
 ### Bug Fixes
