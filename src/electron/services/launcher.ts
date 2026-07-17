@@ -12,6 +12,7 @@ import { getConfig } from './store'
 import { auth, decryptToken } from './auth'
 import { getArcPath, getRegistry as getArcRegistry, syncArcModpack } from './arc'
 import { migrateKeybinds } from './keybindsMigration'
+import { migrateBlur } from './blurMigration'
 import { ensureJava, getJavaExecutable } from './java'
 import type {
   LaunchOptions,
@@ -243,6 +244,27 @@ async function runLaunch(options: LaunchOptions, abort: AbortController): Promis
     sendLog(
       'warn',
       `Migration des touches ignorée : ${error instanceof Error ? error.message : String(error)}`,
+      'launcher'
+    )
+  }
+
+  // Reset one-shot du flou des menus (voir blurMigration.ts) : force
+  // menuBackgroundBlurriness:0 une fois chez les joueurs existants pour corriger le
+  // bug Iris (menu shader invisible en jeu). Non bloquant : en cas d'échec on lance
+  // quand même.
+  try {
+    const bm = migrateBlur(mcPath)
+    if (bm.status === 'set') {
+      sendLog(
+        'info',
+        `Flou des menus désactivé (menuBackgroundBlurriness ${bm.previous ?? 'absent'} -> 0, backup : ${path.basename(bm.backupPath)})`,
+        'launcher'
+      )
+    }
+  } catch (error) {
+    sendLog(
+      'warn',
+      `Migration du flou ignorée : ${error instanceof Error ? error.message : String(error)}`,
       'launcher'
     )
   }
