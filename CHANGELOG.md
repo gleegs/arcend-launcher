@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.8](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.7...v2.3.8) (2026-07-18)
+
+### Features
+
+- **launcher:** migration one-shot du flou des menus (fix bug shader Iris) ([c09ce2f](https://github.com/gleegs/arcend-launcher-v2/commit/c09ce2f792c825d391afdbb464e5c8d148539253))
+
 ### [2.3.7](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.6...v2.3.7) (2026-07-12)
 
 ### Bug Fixes
