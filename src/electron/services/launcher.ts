@@ -13,6 +13,7 @@ import { auth, decryptToken } from './auth'
 import { getArcPath, getRegistry as getArcRegistry, syncArcModpack } from './arc'
 import { migrateKeybinds } from './keybindsMigration'
 import { migrateBlur } from './blurMigration'
+import { migrateGraphics } from './graphicsMigration'
 import { ensureJava, getJavaExecutable } from './java'
 import type {
   LaunchOptions,
@@ -265,6 +266,26 @@ async function runLaunch(options: LaunchOptions, abort: AbortController): Promis
     sendLog(
       'warn',
       `Migration du flou ignorée : ${error instanceof Error ? error.message : String(error)}`,
+      'launcher'
+    )
+  }
+
+  // Reset one-shot des réglages graphiques (voir graphicsMigration.ts) : pousse
+  // le tuning perfs (particules, distance d'entités, ombre shader, Voxy) une fois
+  // chez les joueurs existants. Non bloquant : en cas d'échec on lance quand même.
+  try {
+    const gm = migrateGraphics(mcPath)
+    if (gm.status === 'applied' && gm.changed.length > 0) {
+      sendLog(
+        'info',
+        `Réglages graphiques par défaut appliqués (${gm.changed.join(', ')})`,
+        'launcher'
+      )
+    }
+  } catch (error) {
+    sendLog(
+      'warn',
+      `Migration graphique ignorée : ${error instanceof Error ? error.message : String(error)}`,
       'launcher'
     )
   }
