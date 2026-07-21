@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.3.9](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.8...v2.3.9) (2026-07-21)
+
+### Features
+
+- **launcher:** migration one-shot des réglages graphiques ([678c485](https://github.com/gleegs/arcend-launcher-v2/commit/678c4851702314f690278b4333d3986bd2d3bfe1))
+
 ### [2.3.8](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.7...v2.3.8) (2026-07-18)
 
 ### Features
