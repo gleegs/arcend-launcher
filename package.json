@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "main": ".vite/build/main.js",
   "private": true,
+  "packageManager": "npm@10.9.4",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
