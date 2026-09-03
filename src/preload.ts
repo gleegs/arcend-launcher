@@ -13,6 +13,7 @@ import type {
 import type { JavaInstallProgress, JavaInstallation, JavaRegistry } from './electron/types/java'
 import type { PackwizInstallProgress, PackwizInstallation } from './electron/types/packwiz'
 import type { ArcInstallProgress, ArcInstallation } from './electron/types/arc'
+import type { MapDownloadProgress, MapInstallation } from './electron/types/mapDownload'
 import type { LaunchOptions, LaunchProgress, LogEntry } from './electron/types/launcher'
 import type { UpdateDownloadedInfo, UpdateStatus } from './electron/types/updater'
 
@@ -94,6 +95,25 @@ const electronApi: ElectronApi = {
     ipcRenderer.invoke(IpcChannels.ARC_FETCH_REMOTE) as Promise<IpcResult<RemoteArc[]>>,
   arcFetchActive: () =>
     ipcRenderer.invoke(IpcChannels.ARC_FETCH_ACTIVE) as Promise<IpcResult<RemoteArc | null>>,
+  mapDownload: (arcId: string) =>
+    ipcRenderer.invoke(IpcChannels.MAP_DOWNLOAD, arcId) as Promise<IpcResult<MapInstallation>>,
+  mapCancel: () => ipcRenderer.invoke(IpcChannels.MAP_CANCEL) as Promise<IpcResult<void>>,
+  mapUninstall: (arcId: string) =>
+    ipcRenderer.invoke(IpcChannels.MAP_UNINSTALL, arcId) as Promise<IpcResult<void>>,
+  mapGetInstallation: (arcId: string) =>
+    ipcRenderer.invoke(IpcChannels.MAP_GET_INSTALLATION, arcId) as Promise<
+      IpcResult<MapInstallation | null>
+    >,
+  mapIsDownloading: () =>
+    ipcRenderer.invoke(IpcChannels.MAP_IS_DOWNLOADING) as Promise<IpcResult<boolean>>,
+  onMapDownloadProgress: (callback: (progress: MapDownloadProgress) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: MapDownloadProgress) =>
+      callback(progress)
+    ipcRenderer.on(IpcChannels.MAP_ON_DOWNLOAD_PROGRESS, handler)
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.MAP_ON_DOWNLOAD_PROGRESS, handler)
+    }
+  },
   articleFetchLatest: () =>
     ipcRenderer.invoke(IpcChannels.ARTICLE_FETCH_LATEST) as Promise<
       IpcResult<LatestArticle | null>

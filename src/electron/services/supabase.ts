@@ -21,6 +21,9 @@ interface SupabaseArcRow {
   thumbnail_url: string | null
   logo_url: string | null
   created_at: string
+  map_url: string | null
+  map_extracted_size_bytes: number | null
+  map_sha256: string | null
 }
 
 function toRemoteArc(row: SupabaseArcRow): RemoteArc {
@@ -41,6 +44,9 @@ function toRemoteArc(row: SupabaseArcRow): RemoteArc {
     thumbnailUrl: row.thumbnail_url,
     logoUrl: row.logo_url,
     createdAt: row.created_at,
+    mapUrl: row.map_url ?? null,
+    mapExtractedSizeBytes: row.map_extracted_size_bytes ?? null,
+    mapSha256: row.map_sha256 ?? null,
   }
 }
 
@@ -74,11 +80,18 @@ async function fetchArcsFromApi(): Promise<RemoteArc[]> {
   return (data ?? []).map(toRemoteArc)
 }
 
+interface RemoteArcsCache {
+  fetchedAt: string
+  arcs: RemoteArc[]
+}
+
 function readCache(): RemoteArc[] | null {
   try {
     if (!fs.existsSync(remoteArcsCachePath)) return null
     const raw = fs.readFileSync(remoteArcsCachePath, 'utf-8')
-    return JSON.parse(raw) as RemoteArc[]
+    const parsed = JSON.parse(raw) as RemoteArcsCache | RemoteArc[]
+    // Ancien format (plain array) encore accepté à la lecture.
+    return Array.isArray(parsed) ? parsed : parsed.arcs
   } catch {
     return null
   }
@@ -88,7 +101,8 @@ function writeCache(arcs: RemoteArc[]): void {
   if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true })
   }
-  fs.writeFileSync(remoteArcsCachePath, JSON.stringify(arcs, null, 2), 'utf-8')
+  const cache: RemoteArcsCache = { fetchedAt: new Date().toISOString(), arcs }
+  fs.writeFileSync(remoteArcsCachePath, JSON.stringify(cache, null, 2), 'utf-8')
 }
 
 export async function fetchArcsWithCache(): Promise<RemoteArc[]> {
@@ -105,4 +119,14 @@ export async function fetchArcsWithCache(): Promise<RemoteArc[]> {
 export async function fetchActiveArc(): Promise<RemoteArc | null> {
   const arcs = await fetchArcsWithCache()
   return arcs.find(isActiveArc) ?? null
+}
+
+/**
+ * Résout un arc remote par slug (network-first avec fallback cache offline).
+ * Utilisé au lancement pour rafraîchir les URLs volatiles (modpack, map) :
+ * le registre local ne doit jamais être la seule source d'une URL.
+ */
+export async function fetchRemoteArc(arcId: string): Promise<RemoteArc | null> {
+  const arcs = await fetchArcsWithCache()
+  return arcs.find((arc) => arc.slug === arcId) ?? null
 }

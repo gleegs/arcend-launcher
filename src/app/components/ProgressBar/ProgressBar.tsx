@@ -66,10 +66,17 @@ interface ProgressBarProps {
   /** Pourcentage cible [0, 100]. */
   percent: number
   label: string
+  /** Détail secondaire affiché sous la barre (ex. « 12,4 / 30,2 Go »). */
+  sublabel?: string | null
   error?: string | null
 }
 
-export default function ProgressBar({ percent, label, error = null }: ProgressBarProps) {
+export default function ProgressBar({
+  percent,
+  label,
+  sublabel = null,
+  error = null,
+}: ProgressBarProps) {
   // En cas d'erreur on fige à 0 (snap via le hook, target <= previousTarget).
   const displayPercent = useAnimatedPercent(error ? 0 : percent)
 
@@ -104,6 +111,9 @@ export default function ProgressBar({ percent, label, error = null }: ProgressBa
           />
         </div>
       </div>
+      {!error && sublabel && (
+        <span className="text-[10px] text-white/60 text-right px-2 tabular-nums">{sublabel}</span>
+      )}
     </div>
   )
 }

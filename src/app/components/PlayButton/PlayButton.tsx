@@ -6,7 +6,8 @@ import { useArcStore } from '../../store/arc'
 import { useArcSettingsStore } from '../../store/arcSettings'
 import { useAuthStore } from '../../store/auth'
 import { useProgressStore } from '../../store/progress'
-import { remoteArcToMetadata } from '../../../electron/types/arc'
+import { useMapDownloadStore } from '../../store/mapDownload'
+import { isMapAvailable, remoteArcToMetadata } from '../../../electron/types/arc'
 import {
   Download,
   Play,
@@ -15,6 +16,7 @@ import {
   Settings,
   Trash2,
   NotebookPen,
+  Map,
 } from 'lucide-react'
 import { isProposalArc, PROPOSE_ARC_DISCORD_URL } from '../../lib/proposalArc'
 
@@ -32,12 +34,28 @@ export default function PlayButton() {
   const resetInstall = useProgressStore((s) => s.resetInstall)
   const resetLaunch = useProgressStore((s) => s.resetLaunch)
 
+  const mapDownload = useMapDownloadStore((s) => s.mapDownload)
+  const startMapDownload = useMapDownloadStore((s) => s.startMapDownload)
+  const resetMapDownload = useMapDownloadStore((s) => s.resetMapDownload)
+  const mapInstalled = useMapDownloadStore((s) => s.installed[selectedArc?.slug ?? ''] ?? false)
+  const refreshMapInstalled = useMapDownloadStore((s) => s.refreshMapInstalled)
+  const setMapInstalled = useMapDownloadStore((s) => s.setMapInstalled)
+
   const [confirmUninstall, setConfirmUninstall] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [confirmMapRedownload, setConfirmMapRedownload] = useState(false)
 
   const isInstalling = install.active
   const isLaunching = launch.active
   const canPlay = authState.status !== 'unauthenticated'
+
+  // Synchronise l'état « map installée » avec le registre disque (IPC) quand
+  // l'arc sélectionné change.
+  useEffect(() => {
+    if (selectedArc) {
+      refreshMapInstalled(selectedArc.slug)
+    }
+  }, [selectedArc, refreshMapInstalled])
 
   const wasInstallingRef = useRef(false)
   useEffect(() => {
@@ -110,8 +128,36 @@ export default function PlayButton() {
     setConfirmUninstall(false)
   }
 
+  const handleMapDownload = async () => {
+    startMapDownload(selectedArc.slug)
+    const result = await window.electronAPI.mapDownload(selectedArc.slug)
+    if (!result.ok) {
+      resetMapDownload()
+    }
+  }
+
+  const handleMapRedownload = async () => {
+    if (!confirmMapRedownload) {
+      setConfirmMapRedownload(true)
+      return
+    }
+    // Retélécharger = remplacer : on retire l'ancien monde (et les restes
+    // d'un éventuel téléchargement interrompu) avant de relancer.
+    await window.electronAPI.mapUninstall(selectedArc.slug)
+    setMapInstalled(selectedArc.slug, false)
+    setConfirmMapRedownload(false)
+    await handleMapDownload()
+  }
+
+  const handleMapCancel = async () => {
+    await window.electronAPI.mapCancel()
+  }
+
   const isLoading = isInstalling || isLaunching
-  const showKebab = selectedArc.installed && !isLoading
+  const isMapDownloading = mapDownload.active && mapDownload.arcId === selectedArc.slug
+  // Le kebab reste visible pendant le téléchargement de la map (contrairement
+  // à l'install/launch) : c'est le seul point d'entrée pour l'annuler.
+  const showKebab = selectedArc.installed && (!isLoading || isMapDownloading)
   const label = isInstalling
     ? `Installation ${Math.round(install.percent)}%`
     : isLaunching
@@ -145,14 +191,41 @@ export default function PlayButton() {
         icon: <Settings color="#fff0e6" width={16} height={16} />,
         onClick: () => toggleArcSettings(),
       },
-      {
-        label: confirmUninstall ? 'Confirmer ?' : 'Désinstaller',
-        danger: true,
-        keepOpenOnClick: !confirmUninstall,
-        icon: <Trash2 color="#fff" width={16} height={16} />,
-        onClick: handleUninstallClick,
-      },
     ]
+
+    // Téléchargement de la map : visible dès que la map est publiée pour un
+    // arc terminé (contrôlé côté données via Supabase).
+    if (isMapAvailable(selectedArc)) {
+      if (isMapDownloading) {
+        menuItems.push({
+          label: 'Annuler le téléchargement',
+          icon: <Map color="#fff0e6" width={16} height={16} />,
+          onClick: handleMapCancel,
+        })
+      } else if (mapInstalled) {
+        menuItems.push({
+          label: confirmMapRedownload ? 'Confirmer ?' : 'Retélécharger la map',
+          danger: true,
+          keepOpenOnClick: !confirmMapRedownload,
+          icon: <Map color="#fff" width={16} height={16} />,
+          onClick: handleMapRedownload,
+        })
+      } else {
+        menuItems.push({
+          label: 'Télécharger la map',
+          icon: <Map color="#fff0e6" width={16} height={16} />,
+          onClick: handleMapDownload,
+        })
+      }
+    }
+
+    menuItems.push({
+      label: confirmUninstall ? 'Confirmer ?' : 'Désinstaller',
+      danger: true,
+      keepOpenOnClick: !confirmUninstall,
+      icon: <Trash2 color="#fff" width={16} height={16} />,
+      onClick: handleUninstallClick,
+    })
 
     return (
       <div className="relative w-80">
@@ -171,7 +244,10 @@ export default function PlayButton() {
         <div className="absolute right-0 top-1/2 -translate-y-1/2">
           <DropdownMenu
             items={menuItems}
-            onClose={() => setConfirmUninstall(false)}
+            onClose={() => {
+              setConfirmUninstall(false)
+              setConfirmMapRedownload(false)
+            }}
             trigger={
               <button
                 type="button"

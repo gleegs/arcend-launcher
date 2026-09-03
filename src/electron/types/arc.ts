@@ -15,6 +15,12 @@ export interface RemoteArc {
   thumbnailUrl: string | null
   logoUrl: string | null
   createdAt: string
+  /** URL publique du zip de la map (null tant que la map n'est pas publiée). */
+  mapUrl: string | null
+  /** Taille du monde extrait en octets (indicative : vérif espace disque). */
+  mapExtractedSizeBytes: number | null
+  /** SHA-256 du zip (optionnel : vérification d'intégrité post-téléchargement). */
+  mapSha256: string | null
 }
 
 export interface ArcModLoader {
@@ -59,6 +65,17 @@ export function isActiveArc(arc: RemoteArc): boolean {
   if (now < start) return false
   if (!arc.endDate) return true
   return now <= new Date(arc.endDate)
+}
+
+/**
+ * `true` si la map de l'arc est téléchargeable : l'URL a été publiée dans
+ * Supabase ET l'arc est terminé (date de fin passée). La disponibilité est
+ * donc contrôlée côté données, pas côté code — publier `map_url` suffit.
+ */
+export function isMapAvailable(arc: RemoteArc): boolean {
+  if (!arc.mapUrl) return false
+  if (!arc.endDate) return false
+  return new Date() > new Date(arc.endDate)
 }
 
 export interface ArcInstallation {
