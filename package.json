@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "main": ".vite/build/main.js",
   "private": true,
+  "packageManager": "npm@10.9.4",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -53,6 +54,7 @@
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@types/yauzl": "^3.4.0",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.7.0",
@@ -92,6 +94,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "update-electron-app": "^3.2.0",
+    "yauzl": "^3.4.0",
     "zustand": "^5.0.14"
   },
   "config": {

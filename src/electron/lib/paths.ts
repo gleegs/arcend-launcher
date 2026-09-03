@@ -14,4 +14,5 @@ export const packwizDir = path.join(runtimeDir, 'packwiz')
 export const javaRegistryPath = path.join(configDir, 'java.json')
 export const packwizRegistryPath = path.join(configDir, 'packwiz.json')
 export const arcRegistryPath = path.join(configDir, 'arcs.json')
+export const mapRegistryPath = path.join(configDir, 'maps.json')
 export const launcherConfigPath = configDir

@@ -5,6 +5,7 @@ import Sidebar from './app/components/Sidebar/Sidebar'
 import { useArcStore } from './app/store/arc'
 import { useWindowStore } from './app/store/window'
 import { useProgressStore } from './app/store/progress'
+import { useMapDownloadStore } from './app/store/mapDownload'
 import TitleBar from './app/components/TitleBar/TitleBar'
 import AuthButton from './app/components/AuthButton/AuthButton'
 import SocialButtons from './app/components/SocialButtons/SocialButtons'
@@ -33,12 +34,18 @@ const App = () => {
   const launchPercent = useProgressStore((s) => s.launch.percent)
   const launchLabel = useProgressStore((s) => s.launch.label)
   const launchError = useProgressStore((s) => s.launch.error)
+  const mapDownload = useMapDownloadStore((s) => s.mapDownload)
+  const initMapDownload = useMapDownloadStore((s) => s.init)
   const initProgress = useProgressStore((s) => s.init)
   const initLog = useLogStore((s) => s.init)
 
   useEffect(() => {
     initProgress()
   }, [initProgress])
+
+  useEffect(() => {
+    initMapDownload()
+  }, [initMapDownload])
 
   useEffect(() => {
     initLog()
@@ -112,6 +119,14 @@ const App = () => {
           )}
           {(launchActive || launchError) && (
             <ProgressBar percent={launchPercent} label={launchLabel} error={launchError} />
+          )}
+          {(mapDownload.active || mapDownload.error) && (
+            <ProgressBar
+              percent={mapDownload.percent}
+              label={mapDownload.label}
+              sublabel={mapDownload.sublabel}
+              error={mapDownload.error}
+            />
           )}
           <PlayButton />
         </div>

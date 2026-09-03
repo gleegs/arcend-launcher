@@ -910,6 +910,67 @@ describe('arc service', () => {
     })
   })
 
+  describe('mergeRemoteMetadata', () => {
+    it('returns the same object when remote is null (offline fallback)', async () => {
+      const { mergeRemoteMetadata } = await import('./arc')
+
+      expect(mergeRemoteMetadata(sampleMetadata, null)).toBe(sampleMetadata)
+    })
+
+    it('returns the same object when nothing changed', async () => {
+      const { mergeRemoteMetadata } = await import('./arc')
+      const remote = {
+        slug: 'test-arc',
+        modpackUrl: sampleMetadata.packwizUrl,
+        mcVersion: sampleMetadata.mcVersion,
+        javaVersion: sampleMetadata.javaVersion,
+      }
+
+      expect(mergeRemoteMetadata(sampleMetadata, remote as never)).toBe(sampleMetadata)
+    })
+
+    it('refreshes a changed modpack URL', async () => {
+      const { mergeRemoteMetadata } = await import('./arc')
+      const remote = { slug: 'test-arc', modpackUrl: 'https://example.com/new-pack.toml' }
+
+      const merged = mergeRemoteMetadata(sampleMetadata, remote as never)
+
+      expect(merged).not.toBe(sampleMetadata)
+      expect(merged.packwizUrl).toBe('https://example.com/new-pack.toml')
+      expect(merged.mcVersion).toBe(sampleMetadata.mcVersion)
+    })
+
+    it('refreshes the mod loader as a whole set', async () => {
+      const { mergeRemoteMetadata } = await import('./arc')
+      const remote = {
+        slug: 'test-arc',
+        modpackUrl: sampleMetadata.packwizUrl,
+        loader: 'neoforge',
+        loaderVersion: '60',
+        loaderInstallUrl: 'https://example.com/neoforge.jar',
+      }
+
+      const merged = mergeRemoteMetadata(sampleMetadata, remote as never)
+
+      expect(merged.modLoader).toEqual({
+        type: 'neoforge',
+        version: '60',
+        installerUrl: 'https://example.com/neoforge.jar',
+      })
+    })
+
+    it('keeps the local mod loader when the remote has none', async () => {
+      const { mergeRemoteMetadata } = await import('./arc')
+      const local = {
+        ...sampleMetadata,
+        modLoader: { type: 'forge', version: '51', installerUrl: 'https://a.b/f.jar' },
+      }
+      const remote = { slug: 'test-arc', modpackUrl: local.packwizUrl }
+
+      expect(mergeRemoteMetadata(local, remote as never)).toBe(local)
+    })
+  })
+
   describe('uninstallArc', () => {
     it('removes files and registry entry', async () => {
       const installation = {

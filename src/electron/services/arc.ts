@@ -9,7 +9,14 @@ import { IpcChannels } from '../types/ipc'
 import { arcsDir, arcRegistryPath } from '../lib/paths'
 import { ensurePackwiz, getJarPath } from './packwiz'
 import { ensureJava, getJavaExecutable } from './java'
-import type { ArcInstallation, ArcRegistry, ArcInstallProgress, ArcMetadata } from '../types/arc'
+import { fetchRemoteArc } from './supabase'
+import type {
+  ArcInstallation,
+  ArcRegistry,
+  ArcInstallProgress,
+  ArcMetadata,
+  RemoteArc,
+} from '../types/arc'
 import type { LogEntry, LogLevel } from '../types/launcher'
 
 function getEmptyRegistry(): ArcRegistry {
@@ -352,6 +359,57 @@ async function resolveMetadata(metadata: ArcMetadata): Promise<ArcMetadata> {
   return { ...metadata, mcVersion }
 }
 
+/**
+ * Fusionne les champs volatils (URLs, versions) d'une installation locale avec
+ * leur valeur actuelle côté Supabase. Le registre local ne doit jamais être la
+ * seule source d'une URL : changer `modpack_url` ou `loader_install_url` dans
+ * la DB doit propager aux joueurs sans réinstallation.
+ *
+ * Pure function — retourne l'objet d'origine (identité) si rien ne change,
+ * sinon une nouvelle instance fusionnée. Testable isolément.
+ */
+export function mergeRemoteMetadata(metadata: ArcMetadata, remote: RemoteArc | null): ArcMetadata {
+  if (!remote) return metadata
+
+  const merged: ArcMetadata = { ...metadata }
+  let changed = false
+
+  if (remote.modpackUrl && remote.modpackUrl !== metadata.packwizUrl) {
+    merged.packwizUrl = remote.modpackUrl
+    changed = true
+  }
+  if (remote.mcVersion && remote.mcVersion !== metadata.mcVersion) {
+    merged.mcVersion = remote.mcVersion
+    changed = true
+  }
+  if (remote.javaVersion && remote.javaVersion !== metadata.javaVersion) {
+    merged.javaVersion = remote.javaVersion
+    changed = true
+  }
+
+  const remoteLoader =
+    remote.loader && remote.loaderVersion && remote.loaderInstallUrl
+      ? {
+          type: remote.loader,
+          version: remote.loaderVersion,
+          installerUrl: remote.loaderInstallUrl,
+        }
+      : null
+  const localLoader = metadata.modLoader
+  if (
+    remoteLoader &&
+    (!localLoader ||
+      localLoader.type !== remoteLoader.type ||
+      localLoader.version !== remoteLoader.version ||
+      localLoader.installerUrl !== remoteLoader.installerUrl)
+  ) {
+    merged.modLoader = remoteLoader
+    changed = true
+  }
+
+  return changed ? merged : metadata
+}
+
 export async function installArc(arcId: string, metadata: ArcMetadata): Promise<ArcInstallation> {
   if (!fs.existsSync(arcsDir)) {
     fs.mkdirSync(arcsDir, { recursive: true })
@@ -372,7 +430,11 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     sendProgress({ arcId, percent: 0, status: 'creating_folder' })
 
-    const resolvedMetadata = await resolveMetadata(metadata)
+    // Les metadata passées par le renderer datent du fetch au démarrage du
+    // launcher : on les rafraîchit depuis Supabase (jamais en échec grâce au
+    // fallback cache) pour installer sur les URLs à jour.
+    const remote = await fetchRemoteArc(arcId)
+    const resolvedMetadata = await resolveMetadata(mergeRemoteMetadata(metadata, remote))
 
     if (fs.existsSync(arcPath)) {
       await fs.promises.rm(arcPath, { recursive: true, force: true })
@@ -397,9 +459,6 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
     )
 
     sendProgress({ arcId, percent: 75, status: 'creating_metadata' })
-
-    const arcJsonPath = path.join(arcPath, 'arc.json')
-    fs.writeFileSync(arcJsonPath, JSON.stringify(resolvedMetadata, null, 2), 'utf-8')
 
     const size = await getDirectorySize(arcPath)
 
@@ -439,21 +498,30 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
  * La sortie packwiz (statuts + erreurs) est routée vers les logs.
  */
 export async function syncArcModpack(arcId: string, signal?: AbortSignal): Promise<void> {
-  const installation = getRegistry().installations[arcId]
+  let installation = getRegistry().installations[arcId]
   if (!installation) {
     throw new Error(`Arc "${arcId}" n'est pas installé.`)
   }
+
+  // R2 — fraîcheur des URLs : le registre local gèle l'URL du pack.toml au
+  // moment de l'installation. On relit l'arc remote (Supabase d'abord, cache
+  // offline en secours) et on propage tout changement de `modpack_url` /
+  // loader avant de synchroniser, pour ne pas rester sur une ancienne URL.
+  const remote = await fetchRemoteArc(arcId)
+  const metadata = mergeRemoteMetadata(installation.metadata, remote)
+  if (metadata !== installation.metadata) {
+    installation = { ...installation, metadata }
+    const registry = getRegistry()
+    registry.installations[arcId] = installation
+    saveRegistry(registry)
+    sendPackwizLog('info', '[arcend] Métadonnées de l’arc mises à jour depuis Supabase.')
+  }
+
   const mcPath = path.join(getArcPath(arcId), 'minecraft')
-  const javaVersion = installation.metadata.javaVersion || '21'
+  const javaVersion = metadata.javaVersion || '21'
   await ensureJava(javaVersion)
   await ensurePackwiz()
-  await runPackwizWithRetry(
-    mcPath,
-    getPackTomlSource(installation.metadata),
-    javaVersion,
-    undefined,
-    signal
-  )
+  await runPackwizWithRetry(mcPath, getPackTomlSource(metadata), javaVersion, undefined, signal)
 }
 
 export function uninstallArc(arcId: string): void {
