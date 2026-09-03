@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.4.0](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.9...v2.4.0) (2026-09-03)
+
+### Features
+
+- **map:** download map for finished arcs ([#64](https://github.com/gleegs/arcend-launcher-v2/issues/64)) ([5ee60c3](https://github.com/gleegs/arcend-launcher-v2/commit/5ee60c36b0f174be18b27af8eb14a3f1da05568a))
+
 ### [2.3.9](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.8...v2.3.9) (2026-07-21)
 
 ### Features
