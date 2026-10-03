@@ -32,6 +32,14 @@ vi.mock('./java', () => ({
   getJavaExecutable: (...args: unknown[]) => mockGetJavaExecutable(...args),
 }))
 
+const mockFetchRemoteArc = vi.fn()
+const mockFetchServerState = vi.fn()
+
+vi.mock('./supabase', () => ({
+  fetchRemoteArc: (...args: unknown[]) => mockFetchRemoteArc(...args),
+  fetchServerState: (...args: unknown[]) => mockFetchServerState(...args),
+}))
+
 const {
   mockFsExistsSync,
   mockFsReadFileSync,
@@ -216,9 +224,14 @@ describe('arc service', () => {
     mockGetJarPath.mockReset()
     mockEnsureJava.mockReset()
     mockGetJavaExecutable.mockReset()
+    mockFetchRemoteArc.mockReset().mockResolvedValue(null)
+    mockFetchServerState.mockReset().mockResolvedValue(null)
     mockGetMainWindow.mockReturnValue(null)
     mockApp.isPackaged = false
     delete process.env.ARCEND_PACK_TOML_URL
+    delete process.env.ARCEND_RELEASES_BASE_URL
+    mockFetchRemoteArc.mockReset().mockResolvedValue(null)
+    mockFetchServerState.mockReset().mockResolvedValue(null)
   })
 
   describe('getRegistry', () => {
@@ -907,6 +920,217 @@ describe('arc service', () => {
       expect(mockHttpGet).not.toHaveBeenCalled()
       const spawnArgs = mockSpawn.mock.calls[0][1] as string[]
       expect(spawnArgs[spawnArgs.length - 1]).toBe('https://example.com/pack.toml')
+    })
+
+    it('installs the server-active release even if a newer one is published', async () => {
+      // AC PRD-208 : serveur en 2.3.2, release 2.3.3 publiée mais non adoptée
+      // → le launcher installe/sync 2.3.2 (server_state fait foi).
+      setupSpawnExit(0)
+      mockFetchServerState.mockResolvedValue({
+        arcSlug: 'test-arc',
+        activeRelease: '2.3.2',
+        updatedAt: '2026-10-01T05:00:00Z',
+      })
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcsDir) return true
+        if (p === fakeArcRegistryPath) return true
+        if (p === fakeConfigDir) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return JSON.stringify({ installations: {} })
+        return ''
+      })
+      mockFsReaddirSync.mockReturnValue([])
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+
+      const { installArc } = await import('./arc')
+      const result = await installArc('test-arc', sampleMetadata)
+
+      const spawnArgs = mockSpawn.mock.calls[0][1] as string[]
+      expect(spawnArgs[spawnArgs.length - 1]).toBe(
+        'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.2/pack.toml'
+      )
+      expect(result.metadata.packwizUrl).toBe(
+        'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.2/pack.toml'
+      )
+    })
+  })
+
+  describe('syncArcModpack', () => {
+    it('syncs the server active release URL and persists it in the registry', async () => {
+      setupSpawnExit(0)
+      const installation = {
+        arcId: 'test-arc',
+        path: path.join(fakeArcsDir, 'test-arc'),
+        installedAt: '2026-01-01',
+        metadata: sampleMetadata,
+        size: 1024,
+      }
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath)
+          return JSON.stringify({ installations: { 'test-arc': installation } })
+        return ''
+      })
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+      // Le serveur vient d'adopter 2.3.3 : la sync suivante vise 2.3.3.
+      mockFetchServerState.mockResolvedValue({
+        arcSlug: 'test-arc',
+        activeRelease: '2.3.3',
+        updatedAt: '2026-10-03T05:00:00Z',
+      })
+
+      const { syncArcModpack } = await import('./arc')
+      await syncArcModpack('test-arc')
+
+      const expectedUrl =
+        'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.3/pack.toml'
+      const spawnArgs = mockSpawn.mock.calls[0][1] as string[]
+      expect(spawnArgs[spawnArgs.length - 1]).toBe(expectedUrl)
+
+      // Le registre local garde l'URL versionnée (immuable) pour les prochains lancements.
+      const registryCall = mockFsWriteFileSync.mock.calls.find(
+        (call: unknown[]) => call[0] === fakeArcRegistryPath
+      )
+      const savedData = JSON.parse(registryCall?.[1] as string)
+      expect(savedData.installations['test-arc'].metadata.packwizUrl).toBe(expectedUrl)
+    })
+
+    it('keeps the registered URL when server state is unknown', async () => {
+      setupSpawnExit(0)
+      const installation = {
+        arcId: 'test-arc',
+        path: path.join(fakeArcsDir, 'test-arc'),
+        installedAt: '2026-01-01',
+        metadata: sampleMetadata,
+        size: 1024,
+      }
+      mockFsExistsSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath) return true
+        return false
+      })
+      mockFsReadFileSync.mockImplementation((p: string) => {
+        if (p === fakeArcRegistryPath)
+          return JSON.stringify({ installations: { 'test-arc': installation } })
+        return ''
+      })
+      mockEnsurePackwiz.mockResolvedValue({
+        version: '0.0.3',
+        jarPath: '/runtime/packwiz.jar',
+        installedAt: '2026-01-01',
+      })
+      mockGetJarPath.mockReturnValue('/runtime/packwiz.jar')
+      mockEnsureJava.mockResolvedValue({
+        version: '21',
+        path: '/runtime/java-21',
+        installedAt: '2026-01-01',
+        arch: 'x64',
+      })
+      mockGetJavaExecutable.mockReturnValue('/runtime/java-21/bin/java')
+
+      const { syncArcModpack } = await import('./arc')
+      await syncArcModpack('test-arc')
+
+      const spawnArgs = mockSpawn.mock.calls[0][1] as string[]
+      expect(spawnArgs[spawnArgs.length - 1]).toBe(sampleMetadata.packwizUrl)
+      // Pas de changement de métadonnées : le registre n'est pas réécrit.
+      const registryCall = mockFsWriteFileSync.mock.calls.find(
+        (call: unknown[]) => call[0] === fakeArcRegistryPath
+      )
+      expect(registryCall).toBeUndefined()
+    })
+
+    it('throws when arc is not installed', async () => {
+      mockFsExistsSync.mockReturnValue(false)
+
+      const { syncArcModpack } = await import('./arc')
+
+      await expect(syncArcModpack('unknown-arc')).rejects.toThrow(
+        'Arc "unknown-arc" n\'est pas installé.'
+      )
+    })
+  })
+
+  describe('applyServerState', () => {
+    it('returns the same object when server state is unknown', async () => {
+      const { applyServerState } = await import('./arc')
+
+      expect(applyServerState(sampleMetadata, null)).toBe(sampleMetadata)
+    })
+
+    it('derives the immutable versioned pack URL from the active release', async () => {
+      const { applyServerState } = await import('./arc')
+      const state = {
+        arcSlug: 'test-arc',
+        activeRelease: '2.3.2',
+        updatedAt: '2026-10-03T05:00:00Z',
+      }
+
+      const merged = applyServerState(sampleMetadata, state)
+
+      expect(merged).not.toBe(sampleMetadata)
+      expect(merged.packwizUrl).toBe(
+        'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.2/pack.toml'
+      )
+      expect(merged.mcVersion).toBe(sampleMetadata.mcVersion)
+    })
+
+    it('returns the same object when the URL is already the versioned one', async () => {
+      const { applyServerState } = await import('./arc')
+      const metadata = {
+        ...sampleMetadata,
+        packwizUrl:
+          'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.2/pack.toml',
+      }
+      const state = {
+        arcSlug: 'test-arc',
+        activeRelease: '2.3.2',
+        updatedAt: '2026-10-03T05:00:00Z',
+      }
+
+      expect(applyServerState(metadata, state)).toBe(metadata)
+    })
+
+    it('honours ARCEND_RELEASES_BASE_URL override', async () => {
+      process.env.ARCEND_RELEASES_BASE_URL = 'https://example.com/packs'
+      const { applyServerState } = await import('./arc')
+      const state = {
+        arcSlug: 'test-arc',
+        activeRelease: '2.3.2',
+        updatedAt: '2026-10-03T05:00:00Z',
+      }
+
+      const merged = applyServerState(sampleMetadata, state)
+
+      expect(merged.packwizUrl).toBe('https://example.com/packs/releases/2.3.2/pack.toml')
     })
   })
 

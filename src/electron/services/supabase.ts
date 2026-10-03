@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import fs from 'node:fs'
-import { remoteArcsCachePath, cacheDir } from '../lib/paths'
+import { remoteArcsCachePath, serverStateCachePath, cacheDir } from '../lib/paths'
 import { isActiveArc } from '../types/arc'
-import type { RemoteArc } from '../types/arc'
+import type { RemoteArc, ServerState } from '../types/arc'
 
 interface SupabaseArcRow {
   slug: string
@@ -129,4 +129,77 @@ export async function fetchActiveArc(): Promise<RemoteArc | null> {
 export async function fetchRemoteArc(arcId: string): Promise<RemoteArc | null> {
   const arcs = await fetchArcsWithCache()
   return arcs.find((arc) => arc.slug === arcId) ?? null
+}
+
+interface SupabaseServerStateRow {
+  arc_slug: string
+  active_release: string
+  updated_at: string
+}
+
+function toServerState(row: SupabaseServerStateRow): ServerState {
+  return {
+    arcSlug: row.arc_slug,
+    activeRelease: row.active_release,
+    updatedAt: row.updated_at,
+  }
+}
+
+async function fetchServerStateFromApi(arcSlug: string): Promise<ServerState | null> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from('server_state')
+    .select('*')
+    .eq('arc_slug', arcSlug)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Supabase fetch error: ${error.message}`)
+  }
+  if (!data) return null
+  return toServerState(data as SupabaseServerStateRow)
+}
+
+interface ServerStateCache {
+  fetchedAt: string
+  serverState: ServerState
+}
+
+function readServerStateCache(): ServerState | null {
+  try {
+    if (!fs.existsSync(serverStateCachePath)) return null
+    const raw = fs.readFileSync(serverStateCachePath, 'utf-8')
+    const parsed = JSON.parse(raw) as ServerStateCache | ServerState
+    // Ancien format (objet nu) encore accepté à la lecture.
+    const state = 'serverState' in parsed ? parsed.serverState : parsed
+    return state?.activeRelease ? state : null
+  } catch {
+    return null
+  }
+}
+
+function writeServerStateCache(state: ServerState): void {
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true })
+  }
+  const cache: ServerStateCache = { fetchedAt: new Date().toISOString(), serverState: state }
+  fs.writeFileSync(serverStateCachePath, JSON.stringify(cache, null, 2), 'utf-8')
+}
+
+/**
+ * Résout la release active d'un arc (network-first, fallback cache offline) —
+ * même pattern que `fetchArcsWithCache`. Retourne `null` si l'état est
+ * inconnu (arc absent de la table, Supabase injoignable sans cache) : le
+ * comportement de secours existant (URL de l'arc) s'applique alors.
+ */
+export async function fetchServerState(arcSlug: string): Promise<ServerState | null> {
+  try {
+    const state = await fetchServerStateFromApi(arcSlug)
+    if (state) {
+      writeServerStateCache(state)
+    }
+    return state
+  } catch {
+    return readServerStateCache()
+  }
 }

@@ -9,13 +9,14 @@ import { IpcChannels } from '../types/ipc'
 import { arcsDir, arcRegistryPath } from '../lib/paths'
 import { ensurePackwiz, getJarPath } from './packwiz'
 import { ensureJava, getJavaExecutable } from './java'
-import { fetchRemoteArc } from './supabase'
+import { fetchRemoteArc, fetchServerState } from './supabase'
 import type {
   ArcInstallation,
   ArcRegistry,
   ArcInstallProgress,
   ArcMetadata,
   RemoteArc,
+  ServerState,
 } from '../types/arc'
 import type { LogEntry, LogLevel } from '../types/launcher'
 
@@ -350,6 +351,35 @@ function getPackTomlSource(metadata: ArcMetadata): string {
   return metadata.packwizUrl
 }
 
+/**
+ * Base du release store OVH (releases immuables). Surchageable via
+ * `ARCEND_RELEASES_BASE_URL` (tests, autre bucket).
+ */
+const MODPACK_RELEASES_BASE_DEFAULT = 'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01'
+
+function getReleasesBase(): string {
+  return process.env.ARCEND_RELEASES_BASE_URL ?? MODPACK_RELEASES_BASE_DEFAULT
+}
+
+/**
+ * Aligne les métadonnées sur la release **active du serveur** (server_state) :
+ * l'URL packwiz devient la release versionnée et immuable correspondante,
+ * quelle que soit l'URL (mutable) portée par l'arc. Le launcher ne découvre
+ * jamais « latest » lui-même (doc §6) : sans état connu, l'URL de l'arc est
+ * conservée (comportement de secours existant).
+ *
+ * Pure function — retourne l'objet d'origine (identité) si rien ne change.
+ */
+export function applyServerState(
+  metadata: ArcMetadata,
+  serverState: ServerState | null
+): ArcMetadata {
+  if (!serverState?.activeRelease) return metadata
+  const versionedUrl = `${getReleasesBase()}/releases/${serverState.activeRelease}/pack.toml`
+  if (metadata.packwizUrl === versionedUrl) return metadata
+  return { ...metadata, packwizUrl: versionedUrl }
+}
+
 async function resolveMetadata(metadata: ArcMetadata): Promise<ArcMetadata> {
   if (metadata.mcVersion) return metadata
 
@@ -432,9 +462,17 @@ export async function installArc(arcId: string, metadata: ArcMetadata): Promise<
 
     // Les metadata passées par le renderer datent du fetch au démarrage du
     // launcher : on les rafraîchit depuis Supabase (jamais en échec grâce au
-    // fallback cache) pour installer sur les URLs à jour.
+    // fallback cache) pour installer sur les URLs à jour. L'URL packwiz est
+    // ensuite alignée sur la release active du serveur (server_state), jamais
+    // en avance sur lui.
     const remote = await fetchRemoteArc(arcId)
-    const resolvedMetadata = await resolveMetadata(mergeRemoteMetadata(metadata, remote))
+    const serverState = await fetchServerState(arcId)
+    if (serverState) {
+      sendPackwizLog('info', `[arcend] Release active du serveur : ${serverState.activeRelease}`)
+    }
+    const resolvedMetadata = await resolveMetadata(
+      applyServerState(mergeRemoteMetadata(metadata, remote), serverState)
+    )
 
     if (fs.existsSync(arcPath)) {
       await fs.promises.rm(arcPath, { recursive: true, force: true })
@@ -507,8 +545,14 @@ export async function syncArcModpack(arcId: string, signal?: AbortSignal): Promi
   // moment de l'installation. On relit l'arc remote (Supabase d'abord, cache
   // offline en secours) et on propage tout changement de `modpack_url` /
   // loader avant de synchroniser, pour ne pas rester sur une ancienne URL.
+  // L'URL est ensuite alignée sur la release active du serveur (server_state) :
+  // le launcher sync la version du serveur, jamais « latest ».
   const remote = await fetchRemoteArc(arcId)
-  const metadata = mergeRemoteMetadata(installation.metadata, remote)
+  const serverState = await fetchServerState(arcId)
+  if (serverState) {
+    sendPackwizLog('info', `[arcend] Release active du serveur : ${serverState.activeRelease}`)
+  }
+  const metadata = applyServerState(mergeRemoteMetadata(installation.metadata, remote), serverState)
   if (metadata !== installation.metadata) {
     installation = { ...installation, metadata }
     const registry = getRegistry()

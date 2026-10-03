@@ -23,6 +23,17 @@ export interface RemoteArc {
   mapSha256: string | null
 }
 
+/**
+ * Release active d'un arc côté serveur (table Supabase `server_state`, écrite
+ * par modpack-sync après une installation validée). Le launcher s'y aligne :
+ * il ne découvre jamais « latest » lui-même (doc §6).
+ */
+export interface ServerState {
+  arcSlug: string
+  activeRelease: string
+  updatedAt: string
+}
+
 export interface ArcModLoader {
   type: string
   version: string
