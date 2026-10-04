@@ -6,6 +6,7 @@ import type {
   AuthState,
   ArcMetadata,
   RemoteArc,
+  ServerState,
   LatestArticle,
   ServerStatus,
   IpcResult,
@@ -95,6 +96,10 @@ const electronApi: ElectronApi = {
     ipcRenderer.invoke(IpcChannels.ARC_FETCH_REMOTE) as Promise<IpcResult<RemoteArc[]>>,
   arcFetchActive: () =>
     ipcRenderer.invoke(IpcChannels.ARC_FETCH_ACTIVE) as Promise<IpcResult<RemoteArc | null>>,
+  arcFetchServerState: (arcSlug: string) =>
+    ipcRenderer.invoke(IpcChannels.ARC_FETCH_SERVER_STATE, arcSlug) as Promise<
+      IpcResult<ServerState | null>
+    >,
   mapDownload: (arcId: string) =>
     ipcRenderer.invoke(IpcChannels.MAP_DOWNLOAD, arcId) as Promise<IpcResult<MapInstallation>>,
   mapCancel: () => ipcRenderer.invoke(IpcChannels.MAP_CANCEL) as Promise<IpcResult<void>>,

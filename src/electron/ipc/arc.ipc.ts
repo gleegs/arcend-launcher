@@ -6,7 +6,7 @@ import {
   isInstalled,
   getArcPath,
 } from '../services/arc'
-import { fetchArcsWithCache, fetchActiveArc } from '../services/supabase'
+import { fetchArcsWithCache, fetchActiveArc, fetchServerState } from '../services/supabase'
 import type { ArcMetadata } from '../types/arc'
 import { safeHandle } from './utils'
 
@@ -26,4 +26,8 @@ export function registerArcIpc(): void {
   safeHandle(IpcChannels.ARC_FETCH_REMOTE, () => fetchArcsWithCache())
 
   safeHandle(IpcChannels.ARC_FETCH_ACTIVE, () => fetchActiveArc())
+
+  safeHandle(IpcChannels.ARC_FETCH_SERVER_STATE, (arcSlug: unknown) =>
+    fetchServerState(arcSlug as string)
+  )
 }

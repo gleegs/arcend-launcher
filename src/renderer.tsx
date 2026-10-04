@@ -6,6 +6,7 @@ import { useArcStore } from './app/store/arc'
 import { useWindowStore } from './app/store/window'
 import { useProgressStore } from './app/store/progress'
 import { useMapDownloadStore } from './app/store/mapDownload'
+import { useModpackVersionStore, isModpackUpdatePending } from './app/store/modpackVersion'
 import TitleBar from './app/components/TitleBar/TitleBar'
 import AuthButton from './app/components/AuthButton/AuthButton'
 import SocialButtons from './app/components/SocialButtons/SocialButtons'
@@ -33,7 +34,12 @@ const App = () => {
   const launchActive = useProgressStore((s) => s.launch.active)
   const launchPercent = useProgressStore((s) => s.launch.percent)
   const launchLabel = useProgressStore((s) => s.launch.label)
+  const launchStatus = useProgressStore((s) => s.launch.status)
   const launchError = useProgressStore((s) => s.launch.error)
+  const serverRelease = useModpackVersionStore((s) => s.serverRelease)
+  const installedRelease = useModpackVersionStore((s) => s.installedRelease)
+  const modpackInstalled = useModpackVersionStore((s) => s.installed)
+  const refreshModpackVersion = useModpackVersionStore((s) => s.refresh)
   const mapDownload = useMapDownloadStore((s) => s.mapDownload)
   const initMapDownload = useMapDownloadStore((s) => s.init)
   const initProgress = useProgressStore((s) => s.init)
@@ -63,6 +69,12 @@ const App = () => {
       img.src = cachedImage(url)
     })
   }, [selectedArc])
+
+  useEffect(() => {
+    if (selectedArc) {
+      refreshModpackVersion(selectedArc.slug)
+    }
+  }, [selectedArc, refreshModpackVersion])
 
   // Re-evaluate the time-of-day cover every minute so the hero background
   // switches live (e.g. day -> sunset) while the launcher stays open.
@@ -118,7 +130,20 @@ const App = () => {
             <ProgressBar percent={installPercent} label={installLabel} error={installError} />
           )}
           {(launchActive || launchError) && (
-            <ProgressBar percent={launchPercent} label={launchLabel} error={launchError} />
+            <ProgressBar
+              percent={launchPercent}
+              label={
+                launchStatus === 'validating_arc' &&
+                isModpackUpdatePending({
+                  installed: modpackInstalled,
+                  serverRelease,
+                  installedRelease,
+                })
+                  ? `Mise à jour du modpack vers ${serverRelease}…`
+                  : launchLabel
+              }
+              error={launchError}
+            />
           )}
           {(mapDownload.active || mapDownload.error) && (
             <ProgressBar

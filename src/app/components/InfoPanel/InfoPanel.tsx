@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
-import { ArrowRight, Users, Map, Maximize2, Minimize2 } from 'lucide-react'
+import { ArrowRight, Users, Map, Maximize2, Minimize2, Boxes } from 'lucide-react'
 import { useArcStore } from '../../store/arc'
 import { useLogStore } from '../../store/log'
 import { useProgressStore } from '../../store/progress'
+import { useModpackVersionStore, isModpackUpdatePending } from '../../store/modpackVersion'
 import LogRow from '../LogRow/LogRow'
 import { isProposalArc } from '../../lib/proposalArc'
 import type { LatestArticle } from '../../../electron/types/article'
@@ -42,6 +43,9 @@ export default function InfoPanel() {
   const selectedArc = useArcStore((s) => s.selectedArc)
   const logs = useLogStore((s) => s.logs)
   const launchStatus = useProgressStore((s) => s.launch.status)
+  const serverRelease = useModpackVersionStore((s) => s.serverRelease)
+  const installedRelease = useModpackVersionStore((s) => s.installedRelease)
+  const modpackInstalled = useModpackVersionStore((s) => s.installed)
   const [server, setServer] = useState<ServerStatus | null>(null)
 
   const progress = computeArcProgress(selectedArc?.startDate ?? null, selectedArc?.endDate ?? null)
@@ -144,7 +148,11 @@ export default function InfoPanel() {
       <div
         className={clsx(
           'relative -mt-px overflow-hidden rounded-[4px] rounded-tl-none p-3 shadow-glass-lg transition-[height] duration-300 ease-out',
-          activeTab === 'logs' && logsExpanded ? 'h-[440px]' : 'h-[156px]',
+          activeTab === 'logs' && logsExpanded
+            ? 'h-[440px]'
+            : activeTab === 'serveur'
+              ? 'h-[196px]'
+              : 'h-[156px]',
           activeTab === 'logs' ? 'bg-black text-white' : 'bg-white text-black'
         )}
       >
@@ -171,6 +179,26 @@ export default function InfoPanel() {
               </div>
               <div className="mt-0.5 text-[10px] font-bold uppercase text-black/50">
                 Statut du serveur
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 text-[16px] font-black uppercase leading-none">
+                Modpack {serverRelease ?? '—'}
+                <Boxes width={16} height={16} />
+              </div>
+              <div className="mt-0.5 text-[10px] font-bold uppercase text-black/50">
+                {!modpackInstalled && !selectedArc?.installed
+                  ? 'Non installé'
+                  : isModpackUpdatePending({
+                        installed: modpackInstalled || Boolean(selectedArc?.installed),
+                        serverRelease,
+                        installedRelease,
+                      })
+                    ? `Installé ${installedRelease ?? '—'} · mise à jour au prochain lancement`
+                    : serverRelease
+                      ? 'À jour'
+                      : `Installé ${installedRelease ?? '—'}`}
               </div>
             </div>
 

@@ -7,6 +7,7 @@ import { useArcSettingsStore } from '../../store/arcSettings'
 import { useAuthStore } from '../../store/auth'
 import { useProgressStore } from '../../store/progress'
 import { useMapDownloadStore } from '../../store/mapDownload'
+import { useModpackVersionStore, isModpackUpdatePending } from '../../store/modpackVersion'
 import { isMapAvailable, remoteArcToMetadata } from '../../../electron/types/arc'
 import {
   Download,
@@ -33,6 +34,11 @@ export default function PlayButton() {
   const startInstall = useProgressStore((s) => s.startInstall)
   const resetInstall = useProgressStore((s) => s.resetInstall)
   const resetLaunch = useProgressStore((s) => s.resetLaunch)
+
+  const serverRelease = useModpackVersionStore((s) => s.serverRelease)
+  const installedRelease = useModpackVersionStore((s) => s.installedRelease)
+  const modpackInstalled = useModpackVersionStore((s) => s.installed)
+  const refreshModpackVersion = useModpackVersionStore((s) => s.refresh)
 
   const mapDownload = useMapDownloadStore((s) => s.mapDownload)
   const startMapDownload = useMapDownloadStore((s) => s.startMapDownload)
@@ -63,9 +69,18 @@ export default function PlayButton() {
       wasInstallingRef.current && !install.active && install.percent === 100 && !install.error
     if (justCompleted && selectedArc) {
       setArcInstalled(selectedArc.slug, true)
+      // La version locale vient de changer : on rafraîchit l'état client/serveur.
+      refreshModpackVersion(selectedArc.slug)
     }
     wasInstallingRef.current = install.active
-  }, [install.active, install.percent, install.error, selectedArc, setArcInstalled])
+  }, [
+    install.active,
+    install.percent,
+    install.error,
+    selectedArc,
+    setArcInstalled,
+    refreshModpackVersion,
+  ])
 
   if (!selectedArc) return null
 
@@ -158,10 +173,20 @@ export default function PlayButton() {
   // Le kebab reste visible pendant le téléchargement de la map (contrairement
   // à l'install/launch) : c'est le seul point d'entrée pour l'annuler.
   const showKebab = selectedArc.installed && (!isLoading || isMapDownloading)
+  // PRD-209 : pendant la vérification du modpack au lancement, on distingue
+  // une vraie mise à jour (release serveur ≠ version locale) d'une simple
+  // validation incrémentale.
+  const updatePending = isModpackUpdatePending({
+    installed: modpackInstalled,
+    serverRelease,
+    installedRelease,
+  })
   const label = isInstalling
     ? `Installation ${Math.round(install.percent)}%`
     : isLaunching
-      ? 'Lancement...'
+      ? launch.status === 'validating_arc' && updatePending
+        ? 'Mise à jour...'
+        : 'Lancement...'
       : selectedArc.installed
         ? 'Jouer'
         : 'Installer'

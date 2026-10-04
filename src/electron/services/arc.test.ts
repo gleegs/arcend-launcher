@@ -1100,6 +1100,8 @@ describe('arc service', () => {
       expect(merged.packwizUrl).toBe(
         'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.2/pack.toml'
       )
+      // PRD-209 : la version affichable est tamponnée avec la release installée.
+      expect(merged.version).toBe('2.3.2')
       expect(merged.mcVersion).toBe(sampleMetadata.mcVersion)
     })
 
@@ -1107,6 +1109,7 @@ describe('arc service', () => {
       const { applyServerState } = await import('./arc')
       const metadata = {
         ...sampleMetadata,
+        version: '2.3.2',
         packwizUrl:
           'https://arcend-modpacks.s3.gra.io.cloud.ovh.net/arc01/releases/2.3.2/pack.toml',
       }

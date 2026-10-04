@@ -1,6 +1,12 @@
 import type { JavaInstallation, JavaInstallProgress, JavaRegistry } from './java'
 import type { PackwizInstallation, PackwizInstallProgress } from './packwiz'
-import type { ArcInstallation, ArcInstallProgress, ArcMetadata, RemoteArc } from './arc'
+import type {
+  ArcInstallation,
+  ArcInstallProgress,
+  ArcMetadata,
+  RemoteArc,
+  ServerState,
+} from './arc'
 import type { MapDownloadProgress, MapInstallation } from './mapDownload'
 import type { LaunchOptions, LaunchProgress, LogEntry } from './launcher'
 import type { UpdateStatus, UpdateDownloadedInfo } from './updater'
@@ -68,6 +74,7 @@ export const IpcChannels = {
   ARC_ON_INSTALL_PROGRESS: 'arc:onInstallProgress',
   ARC_FETCH_REMOTE: 'arc:fetchRemote',
   ARC_FETCH_ACTIVE: 'arc:fetchActive',
+  ARC_FETCH_SERVER_STATE: 'arc:fetchServerState',
   MAP_DOWNLOAD: 'map:download',
   MAP_CANCEL: 'map:cancel',
   MAP_UNINSTALL: 'map:uninstall',
@@ -130,6 +137,7 @@ export interface ElectronApi {
   onArcInstallProgress: (callback: (progress: ArcInstallProgress) => void) => () => void
   arcFetchRemote: () => Promise<IpcResult<RemoteArc[]>>
   arcFetchActive: () => Promise<IpcResult<RemoteArc | null>>
+  arcFetchServerState: (arcSlug: string) => Promise<IpcResult<ServerState | null>>
   mapDownload: (arcId: string) => Promise<IpcResult<MapInstallation>>
   mapCancel: () => Promise<IpcResult<void>>
   mapUninstall: (arcId: string) => Promise<IpcResult<void>>
@@ -151,6 +159,6 @@ export interface ElectronApi {
 }
 
 export type { ArcMetadata, RemoteArc } from './arc'
-export type { ArcModLoader } from './arc'
+export type { ArcModLoader, ServerState } from './arc'
 export type { LatestArticle } from './article'
 export type { ServerStatus } from './server'

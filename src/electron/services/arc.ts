@@ -364,9 +364,10 @@ function getReleasesBase(): string {
 /**
  * Aligne les métadonnées sur la release **active du serveur** (server_state) :
  * l'URL packwiz devient la release versionnée et immuable correspondante,
- * quelle que soit l'URL (mutable) portée par l'arc. Le launcher ne découvre
- * jamais « latest » lui-même (doc §6) : sans état connu, l'URL de l'arc est
- * conservée (comportement de secours existant).
+ * quelle que soit l'URL (mutable) portée par l'arc, et `version` est tamponnée
+ * avec la release effectivement installée (affichée par l'UI). Le launcher ne
+ * découvre jamais « latest » lui-même (doc §6) : sans état connu, les
+ * métadonnées d'origine sont conservées (comportement de secours existant).
  *
  * Pure function — retourne l'objet d'origine (identité) si rien ne change.
  */
@@ -376,8 +377,10 @@ export function applyServerState(
 ): ArcMetadata {
   if (!serverState?.activeRelease) return metadata
   const versionedUrl = `${getReleasesBase()}/releases/${serverState.activeRelease}/pack.toml`
-  if (metadata.packwizUrl === versionedUrl) return metadata
-  return { ...metadata, packwizUrl: versionedUrl }
+  if (metadata.packwizUrl === versionedUrl && metadata.version === serverState.activeRelease) {
+    return metadata
+  }
+  return { ...metadata, packwizUrl: versionedUrl, version: serverState.activeRelease }
 }
 
 async function resolveMetadata(metadata: ArcMetadata): Promise<ArcMetadata> {

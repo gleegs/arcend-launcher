@@ -17,6 +17,7 @@ const mockIsInstalled = vi.fn()
 const mockGetArcPath = vi.fn()
 const mockFetchArcsWithCache = vi.fn()
 const mockFetchActiveArc = vi.fn()
+const mockFetchServerState = vi.fn()
 
 vi.mock('../services/arc', () => ({
   getInstalledArcs: (...args: unknown[]) => mockGetInstalledArcs(...args),
@@ -29,6 +30,7 @@ vi.mock('../services/arc', () => ({
 vi.mock('../services/supabase', () => ({
   fetchArcsWithCache: (...args: unknown[]) => mockFetchArcsWithCache(...args),
   fetchActiveArc: (...args: unknown[]) => mockFetchActiveArc(...args),
+  fetchServerState: (...args: unknown[]) => mockFetchServerState(...args),
 }))
 
 vi.mock('../lib/paths', () => ({
@@ -46,12 +48,13 @@ describe('registerArcIpc', () => {
     mockGetArcPath.mockReset()
     mockFetchArcsWithCache.mockReset()
     mockFetchActiveArc.mockReset()
+    mockFetchServerState.mockReset()
     vi.resetModules()
     const { registerArcIpc } = await import('./arc.ipc')
     registerArcIpc()
   })
 
-  it('registers exactly 7 arc channels', () => {
+  it('registers exactly 8 arc channels', () => {
     expect(handlers['arc:getRegistry']).toBeDefined()
     expect(handlers['arc:install']).toBeDefined()
     expect(handlers['arc:uninstall']).toBeDefined()
@@ -59,7 +62,8 @@ describe('registerArcIpc', () => {
     expect(handlers['arc:getPath']).toBeDefined()
     expect(handlers['arc:fetchRemote']).toBeDefined()
     expect(handlers['arc:fetchActive']).toBeDefined()
-    expect(Object.keys(handlers)).toHaveLength(7)
+    expect(handlers['arc:fetchServerState']).toBeDefined()
+    expect(Object.keys(handlers)).toHaveLength(8)
   })
 
   it('arc:getRegistry calls getInstalledArcs and returns { ok: true, data }', async () => {
@@ -141,6 +145,16 @@ describe('registerArcIpc', () => {
 
     expect(mockFetchActiveArc).toHaveBeenCalled()
     expect(result).toEqual({ ok: true, data: activeArc })
+  })
+
+  it('arc:fetchServerState calls fetchServerState with the slug and returns { ok: true, data }', async () => {
+    const serverState = { arcSlug: 'test-arc', activeRelease: '2.3.2', updatedAt: '2026-10-01' }
+    mockFetchServerState.mockResolvedValue(serverState)
+
+    const result = await handlers['arc:fetchServerState']({}, 'test-arc')
+
+    expect(mockFetchServerState).toHaveBeenCalledWith('test-arc')
+    expect(result).toEqual({ ok: true, data: serverState })
   })
 
   it('returns { ok: false, error } when handler throws an Error', async () => {
