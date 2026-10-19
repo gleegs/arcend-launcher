@@ -29,14 +29,19 @@ vi.mock('node:fs', () => {
   return { __esModule: true, default: fns, ...fns }
 })
 
-const { mockMaybeSingle, mockEq, mockSelect, mockFrom, mockCreateClient } = vi.hoisted(() => {
-  const mockMaybeSingle = vi.fn()
-  const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }))
-  const mockSelect = vi.fn(() => ({ eq: mockEq }))
-  const mockFrom = vi.fn(() => ({ select: mockSelect }))
-  const mockCreateClient = vi.fn((..._args: unknown[]) => ({ from: mockFrom }))
-  return { mockMaybeSingle, mockEq, mockSelect, mockFrom, mockCreateClient }
-})
+const { mockMaybeSingle, mockEq, mockOrder, mockSelect, mockFrom, mockCreateClient } = vi.hoisted(
+  () => {
+    const mockMaybeSingle = vi.fn()
+    const mockEq = vi.fn(() => ({ maybeSingle: mockMaybeSingle }))
+    const mockOrder = vi.fn()
+    const mockSelect = vi.fn(() => ({ eq: mockEq, order: mockOrder }))
+    const mockFrom = vi.fn(() => ({ select: mockSelect }))
+    const mockCreateClient = vi.fn((..._args: unknown[]) => ({ from: mockFrom }))
+    return { mockMaybeSingle, mockEq, mockOrder, mockSelect, mockFrom, mockCreateClient }
+  }
+)
+
+vi.mock('electron', () => ({ app: { isPackaged: true } }))
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
@@ -56,6 +61,7 @@ describe('supabase service — server_state', () => {
     mockFsMkdirSync.mockReset()
     mockFsWriteFileSync.mockReset()
     mockMaybeSingle.mockReset()
+    mockOrder.mockReset()
     mockEq.mockClear()
     mockSelect.mockClear()
     mockFrom.mockClear()
@@ -123,6 +129,30 @@ describe('supabase service — server_state', () => {
     })
   })
 
+  it('ignores the cached state of another arc when Supabase is unreachable', async () => {
+    mockMaybeSingle.mockRejectedValue(new Error('fetch failed'))
+    mockFsExistsSync.mockReturnValue(true)
+    mockFsReadFileSync.mockImplementation((p: unknown) => {
+      if (p === fakeServerStateCachePath) {
+        return JSON.stringify({
+          fetchedAt: '2026-09-30T05:00:00Z',
+          serverState: {
+            arcSlug: 'arcend-prologue',
+            activeRelease: '2.3.2',
+            updatedAt: '2026-09-30T05:00:00Z',
+          },
+        })
+      }
+      return ''
+    })
+
+    const { fetchServerState } = await import('./supabase')
+    const result = await fetchServerState('arcend-arc02')
+
+    // Sans ce filtre, la release 2.3.2 de l'Arc 01 serait installée dans l'Arc 02.
+    expect(result).toBeNull()
+  })
+
   it('accepts the legacy bare-object cache format', async () => {
     mockMaybeSingle.mockRejectedValue(new Error('fetch failed'))
     mockFsExistsSync.mockReturnValue(true)
@@ -152,5 +182,77 @@ describe('supabase service — server_state', () => {
     const result = await fetchServerState('arcend-prologue')
 
     expect(result).toBeNull()
+  })
+})
+
+const sampleArcRow = {
+  slug: 'arcend-arc02',
+  name: 'Cave Horror',
+  description: null,
+  version: null,
+  start_date: '2026-10-20T18:00:00Z',
+  end_date: '2026-11-03T22:00:00Z',
+  mc_version: '1.20.1',
+  java_version: '17',
+  loader: 'forge',
+  loader_version: '47.4.23',
+  loader_install_url: 'https://example.com/forge-installer.jar',
+  modpack_url: 'https://example.com/arc02/releases/0.2.0/pack.toml',
+  cover_url: null,
+  thumbnail_url: null,
+  logo_url: null,
+  created_at: '2026-10-19T00:00:00Z',
+  map_url: null,
+  map_extracted_size_bytes: null,
+  map_sha256: null,
+}
+
+describe('supabase service — arcs', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    mockFsExistsSync.mockReset()
+    mockFsReadFileSync.mockReset()
+    mockFsWriteFileSync.mockReset()
+    mockOrder.mockReset()
+    mockFrom.mockClear()
+    process.env.SUPABASE_URL = 'https://fake.supabase.co'
+    process.env.SUPABASE_PUBLISHABLE_KEY = 'fake-publishable-key'
+  })
+
+  it("maps the arc's own server address", async () => {
+    mockOrder.mockResolvedValue({
+      data: [{ ...sampleArcRow, server_host: 'play.kinetic.example', server_port: 25570 }],
+      error: null,
+    })
+
+    const { fetchArcsWithCache } = await import('./supabase')
+    const [arc] = await fetchArcsWithCache()
+
+    expect(arc).toMatchObject({ serverHost: 'play.kinetic.example', serverPort: 25570 })
+  })
+
+  it('maps a missing server address (columns not migrated yet) to null', async () => {
+    mockOrder.mockResolvedValue({ data: [sampleArcRow], error: null })
+
+    const { fetchArcsWithCache } = await import('./supabase')
+    const [arc] = await fetchArcsWithCache()
+
+    expect(arc).toMatchObject({ serverHost: null, serverPort: null })
+  })
+
+  it('resolves an arc from the local cache without querying Supabase', async () => {
+    mockFsExistsSync.mockReturnValue(true)
+    mockFsReadFileSync.mockReturnValue(
+      JSON.stringify({
+        fetchedAt: '2026-10-19T00:00:00Z',
+        arcs: [{ slug: 'arcend-arc02', serverHost: 'play.kinetic.example', serverPort: 25570 }],
+      })
+    )
+
+    const { getCachedRemoteArc } = await import('./supabase')
+
+    expect(getCachedRemoteArc('arcend-arc02')).toMatchObject({ serverHost: 'play.kinetic.example' })
+    expect(getCachedRemoteArc('unknown')).toBeNull()
+    expect(mockFrom).not.toHaveBeenCalled()
   })
 })

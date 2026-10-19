@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import fs from 'node:fs'
 import { remoteArcsCachePath, serverStateCachePath, cacheDir } from '../lib/paths'
 import { isActiveArc } from '../types/arc'
+import { withDevArcs } from './devArcs'
 import type { RemoteArc, ServerState } from '../types/arc'
 
 interface SupabaseArcRow {
@@ -24,6 +25,8 @@ interface SupabaseArcRow {
   map_url: string | null
   map_extracted_size_bytes: number | null
   map_sha256: string | null
+  server_host?: string | null
+  server_port?: number | null
 }
 
 function toRemoteArc(row: SupabaseArcRow): RemoteArc {
@@ -47,6 +50,8 @@ function toRemoteArc(row: SupabaseArcRow): RemoteArc {
     mapUrl: row.map_url ?? null,
     mapExtractedSizeBytes: row.map_extracted_size_bytes ?? null,
     mapSha256: row.map_sha256 ?? null,
+    serverHost: row.server_host ?? null,
+    serverPort: row.server_port ?? null,
   }
 }
 
@@ -109,11 +114,20 @@ export async function fetchArcsWithCache(): Promise<RemoteArc[]> {
   try {
     const arcs = await fetchArcsFromApi()
     writeCache(arcs)
-    return arcs
+    return withDevArcs(arcs)
   } catch {
     const cached = readCache()
-    return cached ?? []
+    return withDevArcs(cached ?? [])
   }
+}
+
+/**
+ * Arc par slug depuis le cache local uniquement (sans requête réseau) : pour
+ * les lectures fréquentes (polling du statut serveur) d'un arc déjà récupéré
+ * au démarrage.
+ */
+export function getCachedRemoteArc(arcId: string): RemoteArc | null {
+  return withDevArcs(readCache() ?? []).find((arc) => arc.slug === arcId) ?? null
 }
 
 export async function fetchActiveArc(): Promise<RemoteArc | null> {
@@ -165,14 +179,16 @@ interface ServerStateCache {
   serverState: ServerState
 }
 
-function readServerStateCache(): ServerState | null {
+function readServerStateCache(arcSlug: string): ServerState | null {
   try {
     if (!fs.existsSync(serverStateCachePath)) return null
     const raw = fs.readFileSync(serverStateCachePath, 'utf-8')
     const parsed = JSON.parse(raw) as ServerStateCache | ServerState
     // Ancien format (objet nu) encore accepté à la lecture.
     const state = 'serverState' in parsed ? parsed.serverState : parsed
-    return state?.activeRelease ? state : null
+    // Le cache ne contient que le dernier arc résolu : on ne le rend que pour
+    // ce même arc (sinon la release d'un autre arc serait appliquée).
+    return state?.activeRelease && state.arcSlug === arcSlug ? state : null
   } catch {
     return null
   }
@@ -200,6 +216,6 @@ export async function fetchServerState(arcSlug: string): Promise<ServerState | n
     }
     return state
   } catch {
-    return readServerStateCache()
+    return readServerStateCache(arcSlug)
   }
 }

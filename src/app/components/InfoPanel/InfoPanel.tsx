@@ -46,7 +46,10 @@ export default function InfoPanel() {
   const serverRelease = useModpackVersionStore((s) => s.serverRelease)
   const installedRelease = useModpackVersionStore((s) => s.installedRelease)
   const modpackInstalled = useModpackVersionStore((s) => s.installed)
-  const [server, setServer] = useState<ServerStatus | null>(null)
+  const [serverResult, setServerResult] = useState<{
+    arcSlug: string | undefined
+    status: ServerStatus
+  } | null>(null)
 
   const progress = computeArcProgress(selectedArc?.startDate ?? null, selectedArc?.endDate ?? null)
 
@@ -97,20 +100,24 @@ export default function InfoPanel() {
   const gameActive =
     launchStatus !== 'idle' && launchStatus !== 'closed' && launchStatus !== 'error'
 
+  // Chaque arc peut avoir son propre serveur : on interroge celui de l'arc
+  // sélectionné et on n'affiche que le statut obtenu pour cet arc.
+  const arcSlug = selectedArc?.slug
   useEffect(() => {
     if (gameActive) return
     const fetchServer = () =>
       window.electronAPI
-        .serverFetchStatus()
+        .serverFetchStatus(arcSlug)
         .then((res) => {
-          if (res.ok && res.data) setServer(res.data)
+          if (res.ok && res.data) setServerResult({ arcSlug, status: res.data })
         })
         .catch(() => undefined)
     fetchServer()
     const id = setInterval(fetchServer, 30_000)
     return () => clearInterval(id)
-  }, [gameActive])
+  }, [gameActive, arcSlug])
 
+  const server = serverResult && serverResult.arcSlug === arcSlug ? serverResult.status : null
   const online = server?.online ?? false
   const playerCount = server?.players ?? 0
 

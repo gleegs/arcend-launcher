@@ -44,6 +44,20 @@ vi.mock('./java', () => ({
   getJavaExecutable: (...args: unknown[]) => mockGetJavaExecutable(...args),
 }))
 
+const mockMigrateKeybinds = vi.fn()
+const mockMigrateBlur = vi.fn()
+const mockMigrateGraphics = vi.fn()
+
+vi.mock('./keybindsMigration', () => ({
+  migrateKeybinds: (...args: unknown[]) => mockMigrateKeybinds(...args),
+}))
+vi.mock('./blurMigration', () => ({
+  migrateBlur: (...args: unknown[]) => mockMigrateBlur(...args),
+}))
+vi.mock('./graphicsMigration', () => ({
+  migrateGraphics: (...args: unknown[]) => mockMigrateGraphics(...args),
+}))
+
 const {
   mockFsExistsSync,
   mockFsMkdirSync,
@@ -213,6 +227,9 @@ describe('launcher service', () => {
     mockHttpsGet.mockReset()
     mockHttpGet.mockReset()
     mockLaunch.mockReset()
+    mockMigrateKeybinds.mockReset().mockReturnValue({ status: 'skipped' })
+    mockMigrateBlur.mockReset().mockReturnValue({ status: 'skipped' })
+    mockMigrateGraphics.mockReset().mockReturnValue({ status: 'skipped', changed: [] })
     emitters.length = 0
     mockGetMainWindow.mockReturnValue(null)
   })
@@ -635,6 +652,46 @@ describe('launcher service', () => {
       const emitter = getLatestEmitter()
       emitter.emit('close', 0)
       await launchPromise
+    })
+  })
+
+  describe('launchGame — Arc 01 option migrations', () => {
+    async function launchAndClose(arcId: string) {
+      mockGetArcRegistry.mockReturnValue({
+        installations: { [arcId]: { ...sampleInstallation, arcId } },
+      })
+      setupOnlineAuthMocks()
+      setupJavaMocks()
+      mockLaunch.mockResolvedValue(undefined)
+
+      const { launchGame } = await import('./launcher')
+      const launchPromise = launchGame({ arcId, mode: 'online' })
+      await vi.waitFor(() => {
+        expect(mockLaunch).toHaveBeenCalled()
+      })
+      getLatestEmitter().emit('close', 0)
+      await launchPromise
+    }
+
+    beforeEach(() => {
+      setupArcMocks()
+    })
+
+    it('runs the option migrations for the Arc 01 modpack', async () => {
+      await launchAndClose('arcend-prologue')
+
+      const mcPath = path.join(sampleArcPath, 'minecraft')
+      expect(mockMigrateKeybinds).toHaveBeenCalledWith(mcPath)
+      expect(mockMigrateBlur).toHaveBeenCalledWith(mcPath)
+      expect(mockMigrateGraphics).toHaveBeenCalledWith(mcPath)
+    })
+
+    it('leaves the options of other modpacks untouched', async () => {
+      await launchAndClose('arcend-arc02')
+
+      expect(mockMigrateKeybinds).not.toHaveBeenCalled()
+      expect(mockMigrateBlur).not.toHaveBeenCalled()
+      expect(mockMigrateGraphics).not.toHaveBeenCalled()
     })
   })
 
