@@ -21,6 +21,10 @@ export interface RemoteArc {
   mapExtractedSizeBytes: number | null
   /** SHA-256 du zip (optionnel : vérification d'intégrité post-téléchargement). */
   mapSha256: string | null
+  /** Hôte du serveur Minecraft de l'arc (statut joueurs). null = serveur Arcend par défaut. */
+  serverHost: string | null
+  /** Port du serveur Minecraft de l'arc. null = 25565 (ou ARCEND_SERVER_PORT). */
+  serverPort: number | null
 }
 
 /**

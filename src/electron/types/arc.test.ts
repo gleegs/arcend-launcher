@@ -23,6 +23,8 @@ function makeArc(overrides: Partial<RemoteArc> = {}): RemoteArc {
     mapUrl: null,
     mapExtractedSizeBytes: null,
     mapSha256: null,
+    serverHost: null,
+    serverPort: null,
     ...overrides,
   }
 }

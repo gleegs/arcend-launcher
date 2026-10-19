@@ -159,6 +159,77 @@ async function ensureModLoaderInstaller(
   return installerPath
 }
 
+/**
+ * Arcs dont le modpack est celui de l'Arc 01 : les migrations d'options
+ * (touches, flou des menus, réglages graphiques) corrigent des problèmes de ce
+ * pack et poussent son tuning (Iris, Voxy) ; un autre modpack a ses propres
+ * réglages par défaut.
+ */
+const ARC01_TUNED_ARCS = new Set(['arcend-prologue'])
+
+function runArc01Migrations(mcPath: string): void {
+  // Reset one-shot des touches (voir keybindsMigration.ts) : corrige les joueurs
+  // dont le options.txt a été pollué (mod "Better Options") avant la mise en
+  // place de keybindings.txt. Non bloquant : en cas d'échec on lance quand même.
+  try {
+    const km = migrateKeybinds(mcPath)
+    if (km.status === 'reset') {
+      sendLog(
+        'info',
+        `Touches réinitialisées aux défauts du pack (${km.removed} lignes, backup : ${path.basename(km.backupPath)})`,
+        'launcher'
+      )
+    }
+  } catch (error) {
+    sendLog(
+      'warn',
+      `Migration des touches ignorée : ${error instanceof Error ? error.message : String(error)}`,
+      'launcher'
+    )
+  }
+
+  // Reset one-shot du flou des menus (voir blurMigration.ts) : force
+  // menuBackgroundBlurriness:0 une fois chez les joueurs existants pour corriger le
+  // bug Iris (menu shader invisible en jeu). Non bloquant : en cas d'échec on lance
+  // quand même.
+  try {
+    const bm = migrateBlur(mcPath)
+    if (bm.status === 'set') {
+      sendLog(
+        'info',
+        `Flou des menus désactivé (menuBackgroundBlurriness ${bm.previous ?? 'absent'} -> 0, backup : ${path.basename(bm.backupPath)})`,
+        'launcher'
+      )
+    }
+  } catch (error) {
+    sendLog(
+      'warn',
+      `Migration du flou ignorée : ${error instanceof Error ? error.message : String(error)}`,
+      'launcher'
+    )
+  }
+
+  // Reset one-shot des réglages graphiques (voir graphicsMigration.ts) : pousse
+  // le tuning perfs (particules, distance d'entités, ombre shader, Voxy) une fois
+  // chez les joueurs existants. Non bloquant : en cas d'échec on lance quand même.
+  try {
+    const gm = migrateGraphics(mcPath)
+    if (gm.status === 'applied' && gm.changed.length > 0) {
+      sendLog(
+        'info',
+        `Réglages graphiques par défaut appliqués (${gm.changed.join(', ')})`,
+        'launcher'
+      )
+    }
+  } catch (error) {
+    sendLog(
+      'warn',
+      `Migration graphique ignorée : ${error instanceof Error ? error.message : String(error)}`,
+      'launcher'
+    )
+  }
+}
+
 export async function launchGame(options: LaunchOptions): Promise<void> {
   if (activeLauncher || launchAbort) {
     throw new Error("Un jeu est déjà en cours d'exécution.")
@@ -229,65 +300,10 @@ async function runLaunch(options: LaunchOptions, abort: AbortController): Promis
     return
   }
 
-  // Reset one-shot des touches (voir keybindsMigration.ts) : corrige les joueurs
-  // dont le options.txt a été pollué (mod "Better Options") avant la mise en
-  // place de keybindings.txt. Non bloquant : en cas d'échec on lance quand même.
-  try {
-    const km = migrateKeybinds(mcPath)
-    if (km.status === 'reset') {
-      sendLog(
-        'info',
-        `Touches réinitialisées aux défauts du pack (${km.removed} lignes, backup : ${path.basename(km.backupPath)})`,
-        'launcher'
-      )
-    }
-  } catch (error) {
-    sendLog(
-      'warn',
-      `Migration des touches ignorée : ${error instanceof Error ? error.message : String(error)}`,
-      'launcher'
-    )
-  }
-
-  // Reset one-shot du flou des menus (voir blurMigration.ts) : force
-  // menuBackgroundBlurriness:0 une fois chez les joueurs existants pour corriger le
-  // bug Iris (menu shader invisible en jeu). Non bloquant : en cas d'échec on lance
-  // quand même.
-  try {
-    const bm = migrateBlur(mcPath)
-    if (bm.status === 'set') {
-      sendLog(
-        'info',
-        `Flou des menus désactivé (menuBackgroundBlurriness ${bm.previous ?? 'absent'} -> 0, backup : ${path.basename(bm.backupPath)})`,
-        'launcher'
-      )
-    }
-  } catch (error) {
-    sendLog(
-      'warn',
-      `Migration du flou ignorée : ${error instanceof Error ? error.message : String(error)}`,
-      'launcher'
-    )
-  }
-
-  // Reset one-shot des réglages graphiques (voir graphicsMigration.ts) : pousse
-  // le tuning perfs (particules, distance d'entités, ombre shader, Voxy) une fois
-  // chez les joueurs existants. Non bloquant : en cas d'échec on lance quand même.
-  try {
-    const gm = migrateGraphics(mcPath)
-    if (gm.status === 'applied' && gm.changed.length > 0) {
-      sendLog(
-        'info',
-        `Réglages graphiques par défaut appliqués (${gm.changed.join(', ')})`,
-        'launcher'
-      )
-    }
-  } catch (error) {
-    sendLog(
-      'warn',
-      `Migration graphique ignorée : ${error instanceof Error ? error.message : String(error)}`,
-      'launcher'
-    )
+  // Migrations one-shot des options du jeu : propres au modpack de l'Arc 01
+  // (Better Options, Iris, Voxy…), elles ne s'appliquent pas aux autres arcs.
+  if (ARC01_TUNED_ARCS.has(arcId)) {
+    runArc01Migrations(mcPath)
   }
 
   sendProgress({ status: 'validating_auth', percent: 10 })

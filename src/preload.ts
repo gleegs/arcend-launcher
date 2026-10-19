@@ -123,8 +123,10 @@ const electronApi: ElectronApi = {
     ipcRenderer.invoke(IpcChannels.ARTICLE_FETCH_LATEST) as Promise<
       IpcResult<LatestArticle | null>
     >,
-  serverFetchStatus: () =>
-    ipcRenderer.invoke(IpcChannels.SERVER_FETCH_STATUS) as Promise<IpcResult<ServerStatus>>,
+  serverFetchStatus: (arcSlug?: string) =>
+    ipcRenderer.invoke(IpcChannels.SERVER_FETCH_STATUS, arcSlug) as Promise<
+      IpcResult<ServerStatus>
+    >,
   launchGame: (options: LaunchOptions) =>
     ipcRenderer.invoke(IpcChannels.LAUNCH_GAME, options) as Promise<IpcResult<void>>,
   launchCancel: () => ipcRenderer.invoke(IpcChannels.LAUNCH_CANCEL) as Promise<IpcResult<void>>,
