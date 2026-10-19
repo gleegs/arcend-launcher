@@ -46,6 +46,36 @@ describe('fetchServerStatus', () => {
     })
   })
 
+  it("queries the arc's own server when it has an address", async () => {
+    vi.mocked(GameDig.query).mockResolvedValue({ numplayers: 3, maxplayers: 20 } as never)
+
+    await fetchServerStatus({ host: 'play.kinetic.example', port: 25570 })
+
+    expect(GameDig.query).toHaveBeenCalledWith(
+      expect.objectContaining({ host: 'play.kinetic.example', port: 25570 })
+    )
+  })
+
+  it('defaults the port to 25565 for an arc host without port', async () => {
+    vi.mocked(GameDig.query).mockResolvedValue({ numplayers: 0, maxplayers: 0 } as never)
+
+    await fetchServerStatus({ host: 'play.kinetic.example', port: null })
+
+    expect(GameDig.query).toHaveBeenCalledWith(
+      expect.objectContaining({ host: 'play.kinetic.example', port: 25565 })
+    )
+  })
+
+  it('falls back to the Arcend server when the arc has no host', async () => {
+    vi.mocked(GameDig.query).mockResolvedValue({ numplayers: 0, maxplayers: 0 } as never)
+
+    await fetchServerStatus({ host: null, port: 25570 })
+
+    expect(GameDig.query).toHaveBeenCalledWith(
+      expect.objectContaining({ host: '51.38.180.149', port: 25565 })
+    )
+  })
+
   it('returns an offline status when the query rejects (timeout/unreachable)', async () => {
     vi.mocked(GameDig.query).mockRejectedValue(new Error('Timeout'))
 

@@ -145,7 +145,7 @@ export interface ElectronApi {
   mapIsDownloading: () => Promise<IpcResult<boolean>>
   onMapDownloadProgress: (callback: (progress: MapDownloadProgress) => void) => () => void
   articleFetchLatest: () => Promise<IpcResult<LatestArticle | null>>
-  serverFetchStatus: () => Promise<IpcResult<ServerStatus>>
+  serverFetchStatus: (arcSlug?: string) => Promise<IpcResult<ServerStatus>>
   launchGame: (options: LaunchOptions) => Promise<IpcResult<void>>
   launchCancel: () => Promise<IpcResult<void>>
   launchIsRunning: () => Promise<IpcResult<boolean>>
