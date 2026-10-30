@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.5.0](https://github.com/gleegs/arcend-launcher-v2/compare/v2.4.0...v2.5.0) (2026-10-30)
+
+### Features
+
+- **launcher:** bouton vidéo, export des logs, étiquettes et transition entre arcs ([121215e](https://github.com/gleegs/arcend-launcher-v2/commit/121215ee4b996fd55cbd006987428c968fbd3075))
+- **launcher:** show server and local modpack versions with update state ([753fa5c](https://github.com/gleegs/arcend-launcher-v2/commit/753fa5cfd81357fb95ffde5779de231713beea22))
+- **launcher:** support des arcs hors stack Arcend (serveur par arc, arcs de dev) ([5657465](https://github.com/gleegs/arcend-launcher-v2/commit/5657465baf819696ac7341acd2e7a36489240d79))
+- **launcher:** sync modpack to the server-active release via server_state ([ad87921](https://github.com/gleegs/arcend-launcher-v2/commit/ad8792187e6efbbf3826db04be2a7a0677539732))
+
 ## [2.4.0](https://github.com/gleegs/arcend-launcher-v2/compare/v2.3.9...v2.4.0) (2026-09-03)
 
 ### Features
