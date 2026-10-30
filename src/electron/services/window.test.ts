@@ -16,6 +16,7 @@ const mockShow = vi.fn()
 const mockFocus = vi.fn()
 const mockGetPosition = vi.fn()
 const mockGetSize = vi.fn()
+const mockSetBounds = vi.fn()
 const mockIsMaximized = vi.fn()
 const mockIsDestroyed = vi.fn()
 const mockLoadURL = vi.fn()
@@ -34,6 +35,7 @@ function createMockBrowserWindowInstance() {
     focus: mockFocus,
     getPosition: mockGetPosition,
     getSize: mockGetSize,
+    setBounds: mockSetBounds,
     isMaximized: mockIsMaximized,
     isDestroyed: mockIsDestroyed,
     loadURL: mockLoadURL,
@@ -83,6 +85,7 @@ describe('window service', () => {
     mockFocus.mockReset()
     mockGetPosition.mockReset()
     mockGetSize.mockReset()
+    mockSetBounds.mockReset()
     mockIsMaximized.mockReset()
     mockIsDestroyed.mockReset()
     mockLoadURL.mockReset()
@@ -104,6 +107,8 @@ describe('window service', () => {
 
       expect(win).toBeDefined()
       expect(mockGetConfig).toHaveBeenCalledWith('windowBounds')
+      // Position restaurée, taille fixe (une taille sauvegardée grossie est ignorée).
+      expect(mockWindowOptions.current).toMatchObject({ x: 100, y: 200, width: 1280, height: 720 })
       expect(mockLoadURL).toHaveBeenCalledWith('http://localhost:5173')
     })
 
@@ -318,10 +323,10 @@ describe('window service', () => {
   })
 
   describe('saveWindowBounds (via events)', () => {
-    it('saves bounds on moved event', async () => {
+    it('saves position with the fixed size on moved event', async () => {
       mockGetConfig.mockReturnValue({ x: 0, y: 0, width: 800, height: 600 })
       mockGetPosition.mockReturnValue([150, 250])
-      mockGetSize.mockReturnValue([1024, 768])
+      mockGetSize.mockReturnValue([1283, 722]) // grossie par le bug DPI
       mockIsDestroyed.mockReturnValue(false)
 
       const { createMainWindow } = await import('./window')
@@ -332,8 +337,8 @@ describe('window service', () => {
       expect(mockSetConfig).toHaveBeenCalledWith('windowBounds', {
         x: 150,
         y: 250,
-        width: 1024,
-        height: 768,
+        width: 1280,
+        height: 720,
       })
     })
 
@@ -366,6 +371,30 @@ describe('window service', () => {
       eventHandlers['moved']()
 
       expect(mockSetConfig).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('setWindowPosition', () => {
+    it('moves with setBounds and keeps the fixed size', async () => {
+      mockGetConfig.mockReturnValue({ width: 1280, height: 720 })
+      mockIsDestroyed.mockReturnValue(false)
+
+      const { createMainWindow, setWindowPosition } = await import('./window')
+      createMainWindow()
+      setWindowPosition(10.4, 20.6)
+
+      expect(mockSetBounds).toHaveBeenCalledWith({ x: 10, y: 21, width: 1280, height: 720 })
+    })
+
+    it('does nothing when window is destroyed', async () => {
+      mockGetConfig.mockReturnValue({ width: 1280, height: 720 })
+      mockIsDestroyed.mockReturnValue(true)
+
+      const { createMainWindow, setWindowPosition } = await import('./window')
+      createMainWindow()
+      setWindowPosition(10, 20)
+
+      expect(mockSetBounds).not.toHaveBeenCalled()
     })
   })
 

@@ -38,7 +38,14 @@ process.on('unhandledRejection', (reason) => writeCrashLog('unhandledRejection',
 protocol.registerSchemesAsPrivileged([
   {
     scheme: IMAGE_PROTOCOL,
-    privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true },
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      // Lecture des pixels en canvas (recadrage des vignettes d'arc).
+      corsEnabled: true,
+    },
   },
 ])
 

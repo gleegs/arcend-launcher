@@ -11,6 +11,7 @@ import type { MapDownloadProgress, MapInstallation } from './mapDownload'
 import type { LaunchOptions, LaunchProgress, LogEntry } from './launcher'
 import type { UpdateStatus, UpdateDownloadedInfo } from './updater'
 import type { LatestArticle } from './article'
+import type { LatestYoutubeVideo } from './youtube'
 import type { ServerStatus } from './server'
 
 export interface WindowBounds {
@@ -89,6 +90,8 @@ export const IpcChannels = {
   LAUNCH_ON_PROGRESS: 'launch:onProgress',
   LAUNCH_ON_LOG: 'launch:onLog',
   SHELL_OPEN_PATH: 'shell:openPath',
+  LOGS_EXPORT: 'logs:export',
+  YOUTUBE_FETCH_LATEST: 'youtube:fetchLatest',
   APP_GET_VERSION: 'app:getVersion',
   UPDATER_GET_STATUS: 'updater:getStatus',
   UPDATER_INSTALL: 'updater:install',
@@ -152,6 +155,9 @@ export interface ElectronApi {
   onLaunchProgress: (callback: (progress: LaunchProgress) => void) => () => void
   onLog: (callback: (entry: LogEntry) => void) => () => void
   shellOpenPath: (pathArg: string) => Promise<IpcResult<void>>
+  /** Enregistre le fichier launcher.log complet là où le joueur choisit ; null si annulé. */
+  logsExport: () => Promise<IpcResult<string | null>>
+  youtubeFetchLatest: () => Promise<IpcResult<LatestYoutubeVideo | null>>
   appGetVersion: () => Promise<IpcResult<string>>
   updaterGetStatus: () => Promise<IpcResult<UpdateStatus>>
   updaterInstall: () => Promise<IpcResult<void>>
@@ -161,4 +167,5 @@ export interface ElectronApi {
 export type { ArcMetadata, RemoteArc } from './arc'
 export type { ArcModLoader, ServerState } from './arc'
 export type { LatestArticle } from './article'
+export type { LatestYoutubeVideo } from './youtube'
 export type { ServerStatus } from './server'

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { coverIndexForTime, useArcStore, type ArcItem } from './arc'
+import {
+  classicCoverUrl,
+  coverIndexForTime,
+  hasClassicCovers,
+  useArcStore,
+  type ArcItem,
+} from './arc'
 
 const COVERS = [
   'https://example.com/arc/cover/arc_01_cover_sunset.jpg',
@@ -69,5 +75,37 @@ describe('refreshCoverForTime', () => {
 
     useArcStore.getState().refreshCoverForTime() // still daytime, no override
     expect(useArcStore.getState().coverIndex).toBe(2)
+  })
+})
+
+describe('classic covers', () => {
+  const V2 = COVERS.map((url) => url.replace('/arc_01_', '/v2_arc_01_'))
+
+  afterEach(() => {
+    useArcStore.setState({ classicCovers: false })
+  })
+
+  it('detects versioned covers', () => {
+    expect(hasClassicCovers(V2)).toBe(true)
+    expect(hasClassicCovers(['https://example.com/v2/arc_01_cover_day.jpg'])).toBe(false)
+    expect(hasClassicCovers(COVERS)).toBe(false)
+    expect(hasClassicCovers(null)).toBe(false)
+  })
+
+  it('strips the v2_ prefix and keeps the time-of-day keyword', () => {
+    expect(V2.map(classicCoverUrl)).toEqual(COVERS)
+    expect(classicCoverUrl(COVERS[0])).toBe(COVERS[0])
+    expect(classicCoverUrl('https://example.com/v12_arc_01_cover_night.jpg')).toBe(
+      'https://example.com/arc_01_cover_night.jpg'
+    )
+    expect(coverIndexForTime(V2, at(12))).toBe(1)
+  })
+
+  it('defaults to v2 covers and toggles', () => {
+    expect(useArcStore.getState().classicCovers).toBe(false)
+    useArcStore.getState().toggleClassicCovers()
+    expect(useArcStore.getState().classicCovers).toBe(true)
+    useArcStore.getState().toggleClassicCovers()
+    expect(useArcStore.getState().classicCovers).toBe(false)
   })
 })

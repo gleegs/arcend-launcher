@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
-import { ArrowRight, Users, Map, Maximize2, Minimize2, Boxes } from 'lucide-react'
+import {
+  ArrowRight,
+  Users,
+  Map,
+  Maximize2,
+  Minimize2,
+  Boxes,
+  Copy,
+  Download,
+  Check,
+} from 'lucide-react'
 import { useArcStore } from '../../store/arc'
 import { useLogStore } from '../../store/log'
 import { useProgressStore } from '../../store/progress'
 import { useModpackVersionStore, isModpackUpdatePending } from '../../store/modpackVersion'
 import LogRow from '../LogRow/LogRow'
-import { isProposalArc } from '../../lib/proposalArc'
+import HoverLabel from '../HoverLabel/HoverLabel'
+import { isProposalArc, hasServerTab } from '../../lib/proposalArc'
 import type { LatestArticle } from '../../../electron/types/article'
 import type { ServerStatus } from '../../../electron/types/server'
 
@@ -36,10 +47,15 @@ function computeArcProgress(start: string | null, end: string | null): number {
   return Math.min(100, Math.max(0, ratio * 100))
 }
 
+const LOGS_BUTTON =
+  'flex h-6 w-6 items-center justify-center rounded-full bg-white text-black cursor-pointer border-2 border-transparent hover:border-white hover:scale-110 transition-all duration-250'
+
 export default function InfoPanel() {
   const [tab, setTab] = useState<TabId>('article')
   const [article, setArticle] = useState<LatestArticle | null>(null)
   const [logsExpanded, setLogsExpanded] = useState(false)
+  // Bouton qui vient de réussir (copie / export), pour afficher une coche un instant.
+  const [logsActionDone, setLogsActionDone] = useState<'copy' | 'export' | null>(null)
   const selectedArc = useArcStore((s) => s.selectedArc)
   const logs = useLogStore((s) => s.logs)
   const launchStatus = useProgressStore((s) => s.launch.status)
@@ -54,10 +70,46 @@ export default function InfoPanel() {
   const progress = computeArcProgress(selectedArc?.startDate ?? null, selectedArc?.endDate ?? null)
 
   // Les arcs « à proposer » n'ont que l'onglet Dernier article (pas Serveur ni Logs).
+  // Le Prologue n'a pas d'onglet Serveur.
   const isProposal = isProposalArc(selectedArc?.slug)
-  const tabs = isProposal ? TABS.filter((t) => t.id === 'article') : TABS
-  // Onglet réellement affiché (forcé sur « article » pour les arcs à proposer).
-  const activeTab: TabId = isProposal ? 'article' : tab
+  const showServer = hasServerTab(selectedArc?.slug)
+  const tabs = isProposal
+    ? TABS.filter((t) => t.id === 'article')
+    : showServer
+      ? TABS
+      : TABS.filter((t) => t.id !== 'serveur')
+  // Onglet réellement affiché (forcé sur « article » si l'onglet choisi n'existe pas pour cet arc).
+  const activeTab: TabId = tabs.some((t) => t.id === tab) ? tab : 'article'
+
+  const flashLogsAction = (action: 'copy' | 'export') => {
+    setLogsActionDone(action)
+    setTimeout(() => setLogsActionDone((current) => (current === action ? null : current)), 1500)
+  }
+
+  // Copie toute la session de logs affichée, au même format que launcher.log.
+  const copyLogs = async () => {
+    const text = logs
+      .map(
+        (e) => `[${new Date(e.timestamp).toISOString()}] [${e.level.toUpperCase()}] ${e.message}`
+      )
+      .join('\n')
+    try {
+      await navigator.clipboard.writeText(text)
+      flashLogsAction('copy')
+    } catch {
+      useLogStore.getState().add('Impossible de copier les logs dans le presse-papiers.', 'error')
+    }
+  }
+
+  // Enregistre le fichier launcher.log complet (toutes sessions) en .txt.
+  const exportLogs = async () => {
+    const res = await window.electronAPI.logsExport()
+    if (!res.ok) {
+      useLogStore.getState().add(`Export des logs impossible : ${res.error}`, 'error')
+    } else if (res.data) {
+      flashLogsAction('export')
+    }
+  }
 
   // Auto-scroll des logs vers le bas quand de nouvelles entrées arrivent
   // (sauf si l'utilisateur a remonté pour lire l'historique).
@@ -104,7 +156,7 @@ export default function InfoPanel() {
   // sélectionné et on n'affiche que le statut obtenu pour cet arc.
   const arcSlug = selectedArc?.slug
   useEffect(() => {
-    if (gameActive) return
+    if (gameActive || !showServer) return
     const fetchServer = () =>
       window.electronAPI
         .serverFetchStatus(arcSlug)
@@ -115,7 +167,7 @@ export default function InfoPanel() {
     fetchServer()
     const id = setInterval(fetchServer, 30_000)
     return () => clearInterval(id)
-  }, [gameActive, arcSlug])
+  }, [gameActive, arcSlug, showServer])
 
   const server = serverResult && serverResult.arcSlug === arcSlug ? serverResult.status : null
   const online = server?.online ?? false
@@ -157,7 +209,7 @@ export default function InfoPanel() {
           'relative -mt-px overflow-hidden rounded-[4px] rounded-tl-none p-3 shadow-glass-lg transition-[height] duration-300 ease-out',
           activeTab === 'logs' && logsExpanded
             ? 'h-[440px]'
-            : activeTab === 'serveur'
+            : activeTab === 'serveur' && serverRelease
               ? 'h-[196px]'
               : 'h-[156px]',
           activeTab === 'logs' ? 'bg-black text-white' : 'bg-white text-black'
@@ -189,25 +241,27 @@ export default function InfoPanel() {
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center gap-1.5 text-[16px] font-black uppercase leading-none">
-                Modpack {serverRelease ?? '—'}
-                <Boxes width={16} height={16} />
+            {serverRelease && (
+              <div>
+                <div className="flex items-center gap-1.5 text-[16px] font-black uppercase leading-none">
+                  Modpack {serverRelease ?? '—'}
+                  <Boxes width={16} height={16} />
+                </div>
+                <div className="mt-0.5 text-[10px] font-bold uppercase text-black/50">
+                  {!modpackInstalled && !selectedArc?.installed
+                    ? 'Non installé'
+                    : isModpackUpdatePending({
+                          installed: modpackInstalled || Boolean(selectedArc?.installed),
+                          serverRelease,
+                          installedRelease,
+                        })
+                      ? `Installé ${installedRelease ?? '—'} · mise à jour au prochain lancement`
+                      : serverRelease
+                        ? 'À jour'
+                        : `Installé ${installedRelease ?? '—'}`}
+                </div>
               </div>
-              <div className="mt-0.5 text-[10px] font-bold uppercase text-black/50">
-                {!modpackInstalled && !selectedArc?.installed
-                  ? 'Non installé'
-                  : isModpackUpdatePending({
-                        installed: modpackInstalled || Boolean(selectedArc?.installed),
-                        serverRelease,
-                        installedRelease,
-                      })
-                    ? `Installé ${installedRelease ?? '—'} · mise à jour au prochain lancement`
-                    : serverRelease
-                      ? 'À jour'
-                      : `Installé ${installedRelease ?? '—'}`}
-              </div>
-            </div>
+            )}
 
             <div>
               <div className="flex items-center gap-1.5 text-[16px] font-black uppercase leading-none">
@@ -267,18 +321,57 @@ export default function InfoPanel() {
           ))}
 
         {activeTab === 'logs' && (
-          <button
-            type="button"
-            onClick={() => setLogsExpanded((v) => !v)}
-            className="absolute right-4 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white text-black cursor-pointer border-2 border-transparent hover:border-white hover:scale-110 transition-all duration-250"
-            aria-label={logsExpanded ? 'Réduire les logs' : 'Agrandir les logs'}
-          >
-            {logsExpanded ? (
-              <Minimize2 width={12} height={12} />
-            ) : (
-              <Maximize2 width={12} height={12} />
-            )}
-          </button>
+          <div className="absolute right-4 top-4 z-10 flex gap-1.5">
+            <div className="group/label relative">
+              <button
+                type="button"
+                onClick={exportLogs}
+                className={LOGS_BUTTON}
+                aria-label="Télécharger les logs (.txt)"
+              >
+                {logsActionDone === 'export' ? (
+                  <Check width={12} height={12} />
+                ) : (
+                  <Download width={12} height={12} />
+                )}
+              </button>
+              <HoverLabel side="bottom">
+                {logsActionDone === 'export' ? 'Enregistré' : 'Télécharger'}
+              </HoverLabel>
+            </div>
+            <div className="group/label relative">
+              <button
+                type="button"
+                onClick={copyLogs}
+                className={LOGS_BUTTON}
+                aria-label="Copier les logs"
+              >
+                {logsActionDone === 'copy' ? (
+                  <Check width={12} height={12} />
+                ) : (
+                  <Copy width={12} height={12} />
+                )}
+              </button>
+              <HoverLabel side="bottom">
+                {logsActionDone === 'copy' ? 'Copié' : 'Copier'}
+              </HoverLabel>
+            </div>
+            <div className="group/label relative">
+              <button
+                type="button"
+                onClick={() => setLogsExpanded((v) => !v)}
+                className={LOGS_BUTTON}
+                aria-label={logsExpanded ? 'Réduire les logs' : 'Agrandir les logs'}
+              >
+                {logsExpanded ? (
+                  <Minimize2 width={12} height={12} />
+                ) : (
+                  <Maximize2 width={12} height={12} />
+                )}
+              </button>
+              <HoverLabel side="bottom-end">{logsExpanded ? 'Réduire' : 'Agrandir'}</HoverLabel>
+            </div>
+          </div>
         )}
 
         {activeTab === 'logs' && (

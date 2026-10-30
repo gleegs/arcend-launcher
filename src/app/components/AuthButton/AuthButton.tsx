@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { LogIn, LogOut } from 'lucide-react'
 import Button from '../Button/Button'
+import HoverLabel from '../HoverLabel/HoverLabel'
 import { useAuthStore } from '../../store/auth'
 
 export default function AuthButton() {
@@ -34,7 +35,7 @@ export default function AuthButton() {
     return (
       <Button
         className={clsx(
-          'flex justify-center items-center gap-2 min-w-48 relative',
+          'group/label flex justify-center items-center gap-2 min-w-48 relative',
           showConfirm && 'border-red-500/70! border-2'
         )}
         onClick={handleClick}
@@ -66,6 +67,7 @@ export default function AuthButton() {
           <LogOut className="text-white" />
           <span className="uppercase font-black text-xs">Se déconnecter ?</span>
         </div>
+        {!showConfirm && <HoverLabel side="bottom">Compte Minecraft</HoverLabel>}
       </Button>
     )
   }
