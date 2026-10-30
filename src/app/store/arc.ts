@@ -41,6 +41,22 @@ export function coverIndexForTime(covers: string[] | null | undefined, now = new
   return index === -1 ? 0 : index
 }
 
+const VERSION_PREFIX = /\/v\d+_([^/]+)$/i
+
+/** True when the arc ships versioned covers (`v2_…`) with a classic version alongside. */
+export function hasClassicCovers(covers: string[] | null | undefined): boolean {
+  return !!covers?.some((url) => VERSION_PREFIX.test(url))
+}
+
+/**
+ * Classic version of a cover: same URL without the version prefix
+ * (`v2_arc_01_cover_day.jpg` -> `arc_01_cover_day.jpg`). Order is preserved,
+ * so `coverIndex` stays valid for both sets.
+ */
+export function classicCoverUrl(url: string): string {
+  return url.replace(VERSION_PREFIX, '/$1')
+}
+
 interface ArcStore {
   arcs: ArcItem[]
   setArcs: (arcs: ArcItem[]) => void
@@ -51,6 +67,9 @@ interface ArcStore {
   autoCoverIndex: number
   cycleCover: () => void
   refreshCoverForTime: () => void
+  /** Show classic covers instead of versioned ones. Session only: reset on restart. */
+  classicCovers: boolean
+  toggleClassicCovers: () => void
   setArcInstalled: (arcId: string, installed: boolean) => void
   uninstallArc: (arcId: string) => Promise<boolean>
 }
@@ -78,6 +97,8 @@ export const useArcStore = create<ArcStore>((set, get) => ({
       // so a manual cycle (logo click) is preserved until the next boundary.
       return next === state.autoCoverIndex ? {} : { coverIndex: next, autoCoverIndex: next }
     }),
+  classicCovers: false,
+  toggleClassicCovers: () => set((state) => ({ classicCovers: !state.classicCovers })),
   setArcInstalled: (arcId, installed) =>
     set((state) => ({
       arcs: state.arcs.map((arc) => (arc.slug === arcId ? { ...arc, installed } : arc)),

@@ -1,9 +1,9 @@
 import { GameDig } from 'gamedig'
 import type { ServerAddress, ServerStatus } from '../types/server'
 
-// Serveur Minecraft Java Arcend (nouvelle IP depuis le changement de serveur).
-const HOST = process.env.ARCEND_SERVER_HOST || '51.38.180.149'
-const PORT = Number(process.env.ARCEND_SERVER_PORT) || 25565
+// Serveur Minecraft Java Arcend par défaut (Kinetic, play.arcend.fr).
+const HOST = process.env.ARCEND_SERVER_HOST || 'play.arcend.fr'
+const PORT = Number(process.env.ARCEND_SERVER_PORT) || 25584
 
 /**
  * Interroge le serveur Minecraft via gamedig. Sans adresse (ou sans hôte), le

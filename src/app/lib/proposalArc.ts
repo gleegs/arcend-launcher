@@ -11,3 +11,14 @@ export const PROPOSE_ARC_DISCORD_URL =
 export function isProposalArc(slug: string | null | undefined): boolean {
   return !!slug && PROPOSAL_ARC_SLUGS.has(slug)
 }
+
+// Arcs jouables sans serveur : pas d'onglet Serveur (mais Logs conservé).
+const NO_SERVER_ARC_SLUGS = new Set(['arcend-prologue'])
+
+export function hasServerTab(slug: string | null | undefined): boolean {
+  return !isProposalArc(slug) && !(!!slug && NO_SERVER_ARC_SLUGS.has(slug))
+}
+
+// Arcs épinglés tout en haut de la sidebar, dans cet ordre, quel que soit leur
+// calendrier.
+export const PINNED_ARC_SLUGS = ['arcend-horror', 'arcend-prologue']

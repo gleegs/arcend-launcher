@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { useArcStore } from '../../store/arc'
 import { cachedImage } from '../../lib/cachedImage'
+import { PINNED_ARC_SLUGS } from '../../lib/proposalArc'
 
-// Hauteur d'une vignette d'arc (= largeur du contenu de la sidebar : w-20 −
-// px-2*2) et écart vertical entre vignettes (space-y-2), pour positionner le
-// connecteur de l'arc sélectionné.
-const ARC_ROW_HEIGHT = 64
-const ARC_ROW_GAP = 8
+// Hauteur commune des vignettes d'arc, largeur max (= largeur du contenu de la
+// sidebar : w-20 − px-2*2) et écart vertical entre vignettes (space-y-3), pour
+// positionner le connecteur de l'arc sélectionné.
+const ARC_ROW_HEIGHT = 56
+const ARC_MAX_WIDTH = 64
+const ARC_ROW_GAP = 12
 
 export default function Sidebar() {
   const arcs = useArcStore((s) => s.arcs)
@@ -58,10 +60,19 @@ export default function Sidebar() {
         return bStart - aStart
       })
 
+      // Sélection par défaut : l'arc en cours (premier selon le calendrier),
+      // avant d'épingler Horror puis le Prologue tout en haut.
+      const defaultArc = items[0]
+      const pinned = PINNED_ARC_SLUGS.flatMap((slug) => {
+        const index = items.findIndex((a) => a.slug === slug)
+        return index === -1 ? [] : items.splice(index, 1)
+      })
+      items.unshift(...pinned)
+
       if (versionRes.ok && versionRes.data) setVersion(versionRes.data)
 
       setArcs(items)
-      if (items.length > 0) selectArc(items[0])
+      if (defaultArc) selectArc(defaultArc)
     }
 
     fetchArcs()
@@ -76,9 +87,9 @@ export default function Sidebar() {
           <span className="block text-[13px]">Launcher</span>
         </h3>
       </div>
-      <div className="flex-1 space-y-0.5">
+      <div className="flex-1 space-y-2">
         <h5 className="uppercase font-black text-sm">Arcs</h5>
-        <div className="relative space-y-2 flex-1">
+        <div className="relative space-y-3 flex-1">
           {arcs.map((arc) => (
             <div
               key={arc.slug}
@@ -92,6 +103,8 @@ export default function Sidebar() {
                 src={
                   arc.thumbnailUrl ? cachedImage(arc.thumbnailUrl) : 'https://placehold.co/64x64'
                 }
+                height={ARC_ROW_HEIGHT}
+                maxWidth={ARC_MAX_WIDTH}
               />
             </div>
           ))}

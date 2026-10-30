@@ -1,14 +1,16 @@
 import { createRoot } from 'react-dom/client'
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import './index.css'
 import Sidebar from './app/components/Sidebar/Sidebar'
-import { useArcStore } from './app/store/arc'
+import { useArcStore, hasClassicCovers, classicCoverUrl } from './app/store/arc'
 import { useWindowStore } from './app/store/window'
 import { useProgressStore } from './app/store/progress'
 import { useMapDownloadStore } from './app/store/mapDownload'
 import { useModpackVersionStore, isModpackUpdatePending } from './app/store/modpackVersion'
 import TitleBar from './app/components/TitleBar/TitleBar'
 import AuthButton from './app/components/AuthButton/AuthButton'
+import HoverLabel from './app/components/HoverLabel/HoverLabel'
 import SocialButtons from './app/components/SocialButtons/SocialButtons'
 import SettingsPanel from './app/components/SettingsPanel/SettingsPanel'
 import ArcSettingsPanel from './app/components/ArcSettingsPanel/ArcSettingsPanel'
@@ -17,14 +19,24 @@ import ProgressBar from './app/components/ProgressBar/ProgressBar'
 import UpdateToast from './app/components/UpdateToast/UpdateToast'
 import { useLogStore } from './app/store/log'
 import InfoPanel from './app/components/InfoPanel/InfoPanel'
+import Button from './app/components/Button/Button'
 import { cachedImage } from './app/lib/cachedImage'
 import { startWindowDrag } from './app/lib/windowDrag'
+
+// Durée du fondu enchaîné entre deux arcs (doit couvrir l'animation .arc-scene-in).
+const ARC_TRANSITION_MS = 800
+
+type CoverLayer = { url: string; visible: boolean }
 
 const App = () => {
   const selectedArc = useArcStore((s) => s.selectedArc)
   const coverIndex = useArcStore((s) => s.coverIndex)
   const cycleCover = useArcStore((s) => s.cycleCover)
   const refreshCoverForTime = useArcStore((s) => s.refreshCoverForTime)
+  const classicCovers = useArcStore((s) => s.classicCovers)
+  const toggleClassicCovers = useArcStore((s) => s.toggleClassicCovers)
+  // Cumulative angle so each click spins the icon one more full turn.
+  const [switchRotation, setSwitchRotation] = useState(0)
   const isHiding = useWindowStore((s) => s.isHiding)
   const setIsHiding = useWindowStore((s) => s.setIsHiding)
   const installActive = useProgressStore((s) => s.install.active)
@@ -63,8 +75,44 @@ const App = () => {
     return () => window.removeEventListener('focus', onFocus)
   }, [setIsHiding])
 
+  const covers = selectedArc?.coverUrl ?? []
+  const canSwitchCovers = hasClassicCovers(covers)
+  // Both sets stay mounted so switching cross-fades like the time-of-day change.
+  const coverLayers = covers.flatMap((url, i) => {
+    const layers = [{ url, visible: i === coverIndex && !(canSwitchCovers && classicCovers) }]
+    if (canSwitchCovers && classicCoverUrl(url) !== url) {
+      layers.push({ url: classicCoverUrl(url), visible: i === coverIndex && classicCovers })
+    }
+    return layers
+  })
+
+  // Changement d'arc : l'ancien fond reste affiché dessous le temps que le nouveau
+  // apparaisse par-dessus (fondu enchaîné), au lieu d'être retiré d'un coup.
+  const sceneSlug = selectedArc?.slug ?? null
+  const lastSceneRef = useRef<{ slug: string | null; layers: CoverLayer[] } | null>(null)
+  const [outgoingScene, setOutgoingScene] = useState<{
+    slug: string | null
+    layers: CoverLayer[]
+  } | null>(null)
+  // Layout effects : l'ancien fond est remis dessous AVANT que le navigateur ne
+  // peigne la première image du nouvel arc (sinon un flash noir puis l'ancien fond
+  // réapparaissant une fraction de seconde).
+  useLayoutEffect(() => {
+    // Lu avant la mise à jour du ref (effet suivant) : contient encore l'arc précédent.
+    const last = lastSceneRef.current
+    if (!last || last.slug === sceneSlug) return
+    setOutgoingScene(last)
+    const id = setTimeout(() => setOutgoingScene(null), ARC_TRANSITION_MS)
+    return () => clearTimeout(id)
+  }, [sceneSlug])
+  useLayoutEffect(() => {
+    lastSceneRef.current = { slug: sceneSlug, layers: coverLayers }
+  })
+
   useEffect(() => {
-    selectedArc?.coverUrl?.forEach((url) => {
+    const urls = selectedArc?.coverUrl ?? []
+    const preload = hasClassicCovers(urls) ? [...urls, ...urls.map(classicCoverUrl)] : urls
+    preload.forEach((url) => {
       const img = new Image()
       img.src = cachedImage(url)
     })
@@ -90,31 +138,68 @@ const App = () => {
     >
       <Sidebar />
       <main className="flex-1 rounded-2xl overflow-hidden relative bg-black">
-        {selectedArc?.coverUrl && selectedArc.coverUrl.length > 0 ? (
-          selectedArc.coverUrl.map((url, i) => (
-            <img
-              key={url}
-              src={cachedImage(url)}
-              alt={selectedArc.name ?? ''}
-              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-              style={{ opacity: i === coverIndex ? 1 : 0 }}
-            />
-          ))
-        ) : (
-          <img
-            src="https://placehold.co/600x400?text=Image+Not+Found"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+        {outgoingScene && (
+          <div key={`out-${outgoingScene.slug}`} className="absolute inset-0">
+            {outgoingScene.layers.map(({ url, visible }) => (
+              <img
+                key={url}
+                src={cachedImage(url)}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: visible ? 1 : 0 }}
+              />
+            ))}
+          </div>
         )}
-        <div className="absolute top-0 left-0 p-8" style={{ WebkitAppRegion: 'no-drag' }}>
+        <div key={sceneSlug ?? 'none'} className="arc-scene-in absolute inset-0">
+          {selectedArc && coverLayers.length > 0 ? (
+            coverLayers.map(({ url, visible }) => (
+              <img
+                key={url}
+                src={cachedImage(url)}
+                alt={selectedArc.name ?? ''}
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+                style={{ opacity: visible ? 1 : 0 }}
+              />
+            ))
+          ) : (
+            <img
+              src="https://placehold.co/600x400?text=Image+Not+Found"
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
+        </div>
+        <div
+          className="absolute top-0 left-0 p-8 flex items-start gap-6"
+          style={{ WebkitAppRegion: 'no-drag' }}
+        >
           {selectedArc?.logoUrl && (
             <img
+              key={selectedArc.logoUrl}
               src={cachedImage(selectedArc.logoUrl)}
               alt={selectedArc.name ?? 'Arc logo'}
               onClick={cycleCover}
-              className=" w-40 cursor-pointer transition-transform duration-150 hover:scale-105 active:scale-95"
+              className="arc-logo-in w-40 cursor-pointer transition-transform duration-150 hover:scale-105 active:scale-95"
             />
+          )}
+          {canSwitchCovers && (
+            <Button
+              onClick={() => {
+                toggleClassicCovers()
+                setSwitchRotation((deg) => deg + 360)
+              }}
+              className="group/label relative p-2"
+              aria-label="Changer de fonds"
+              aria-pressed={classicCovers}
+            >
+              <RefreshCw
+                color="#fff"
+                className="transition-transform duration-500 ease-in-out"
+                style={{ transform: `rotate(${switchRotation}deg)` }}
+              />
+              <HoverLabel side="right">Changer de fond</HoverLabel>
+            </Button>
           )}
         </div>
         <div className="absolute top-0 right-0 p-8 flex gap-8">

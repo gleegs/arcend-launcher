@@ -38,8 +38,8 @@ describe('fetchServerStatus', () => {
 
     expect(GameDig.query).toHaveBeenCalledWith({
       type: 'minecraft',
-      host: '51.38.180.149',
-      port: 25565,
+      host: 'play.arcend.fr',
+      port: 25584,
       maxRetries: 1,
       socketTimeout: 3000,
       attemptTimeout: 4000,
@@ -72,7 +72,7 @@ describe('fetchServerStatus', () => {
     await fetchServerStatus({ host: null, port: 25570 })
 
     expect(GameDig.query).toHaveBeenCalledWith(
-      expect.objectContaining({ host: '51.38.180.149', port: 25565 })
+      expect.objectContaining({ host: 'play.arcend.fr', port: 25584 })
     )
   })
 

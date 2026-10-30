@@ -9,6 +9,8 @@ import { registerArticleIpc } from './article.ipc'
 import { registerServerIpc } from './server.ipc'
 import { registerLauncherIpc } from './launcher.ipc'
 import { registerShellIpc } from './shell.ipc'
+import { registerLogsIpc } from './logs.ipc'
+import { registerYoutubeIpc } from './youtube.ipc'
 import { registerAppIpc } from './app.ipc'
 import { registerUpdaterIpc } from './updater.ipc'
 
@@ -24,6 +26,8 @@ export function registerAllIpcHandlers(): void {
   registerServerIpc()
   registerLauncherIpc()
   registerShellIpc()
+  registerLogsIpc()
+  registerYoutubeIpc()
   registerAppIpc()
   registerUpdaterIpc()
 }

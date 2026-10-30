@@ -157,7 +157,11 @@ export function registerImageProtocol(): void {
 
     ensureCacheDir()
     const dest = cachePathFor(targetUrl)
-    const headers = { 'Content-Type': guessMime(targetUrl), 'Cache-Control': 'no-store' }
+    const headers = {
+      'Content-Type': guessMime(targetUrl),
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+    }
 
     // Déjà en cache : service immédiat + revalidation conditionnelle en fond.
     if (fs.existsSync(dest)) {

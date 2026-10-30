@@ -44,6 +44,42 @@
   }
 }
 
+/* Changement d'arc : le nouveau fond arrive par-dessus l'ancien (zoom arrière + flou
+   qui se dissipe), puis le logo descend en place. */
+@keyframes arc-scene-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.arc-scene-in {
+  animation: arc-scene-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes arc-logo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.arc-logo-in {
+  animation: arc-logo-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
 .cover-fade-in {
   animation: cover-fade-in 0.3s ease-out;
 }
@@ -56,6 +92,30 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+.new-badge-pulse {
+  animation: new-badge-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Pastille « Nouveau » : onde aux couleurs de l'arc (--pulse-color) + léger battement.
+   Anime `transform` alors que Tailwind positionne via `translate`/`scale` : pas de conflit. */
+@keyframes new-badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--pulse-color);
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
   }
 }
 

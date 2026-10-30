@@ -17,6 +17,7 @@ import type { ArcInstallProgress, ArcInstallation } from './electron/types/arc'
 import type { MapDownloadProgress, MapInstallation } from './electron/types/mapDownload'
 import type { LaunchOptions, LaunchProgress, LogEntry } from './electron/types/launcher'
 import type { UpdateDownloadedInfo, UpdateStatus } from './electron/types/updater'
+import type { LatestYoutubeVideo } from './electron/types/youtube'
 
 const electronApi: ElectronApi = {
   windowMinimize: () => ipcRenderer.invoke(IpcChannels.WINDOW_MINIMIZE) as Promise<IpcResult<void>>,
@@ -149,6 +150,12 @@ const electronApi: ElectronApi = {
   },
   shellOpenPath: (path: string) =>
     ipcRenderer.invoke(IpcChannels.SHELL_OPEN_PATH, path) as Promise<IpcResult<void>>,
+  youtubeFetchLatest: () =>
+    ipcRenderer.invoke(IpcChannels.YOUTUBE_FETCH_LATEST) as Promise<
+      IpcResult<LatestYoutubeVideo | null>
+    >,
+  logsExport: () =>
+    ipcRenderer.invoke(IpcChannels.LOGS_EXPORT) as Promise<IpcResult<string | null>>,
   appGetVersion: () =>
     ipcRenderer.invoke(IpcChannels.APP_GET_VERSION) as Promise<IpcResult<string>>,
   updaterGetStatus: () =>
